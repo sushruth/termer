@@ -154,7 +154,13 @@ Avoid large blank windows, sidebars with empty state, marketing copy, and purely
 
 Cmd-Q must work in both Termer and generated apps. AppKit needs a real app menu with a Quit item for this.
 
-The manager app does not auto-update (only generated bundles self-regenerate via `builtBy`). The app menu has a **Check for Updates…** item: it compares `Store.version` to the latest GitHub release `tag_name`, and if newer drives the canonical installer (`curl … /install | zsh`, which replaces `~/Applications/Termer.app`) then relaunches. Relaunch quits first and uses a detached `open` after a short sleep, because `open` on the same bundle id would otherwise just reactivate the still-running old instance. This is on-demand only — no background polling.
+The manager app does not auto-update (only generated bundles self-regenerate via `builtBy`). Update flow:
+- On launch, a silent check compares `Store.version` to the latest GitHub release `tag_name`. If newer, a primary accent **Update** pill (layer-backed `controlAccentColor`, white text — not `bezelColor`, which desaturates on an inactive window) appears in the toolbar brand area, left of the Termer name.
+- Clicking the pill shows a one-item menu "Update to vX.Y.Z"; clicking that installs.
+- The app menu also has a **Check for Updates…** item (loud check — alerts when already current).
+- Installing drives the canonical installer (`curl … /install | zsh`, which replaces `~/Applications/Termer.app`) then relaunches: it quits first and uses a detached `open` after a short sleep, because `open` on the same bundle id would otherwise just reactivate the still-running old instance.
+
+No background polling — the launch check is the only automatic one.
 
 Closing the last generated app window should terminate normally, not crash or leave a dead process.
 

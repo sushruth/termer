@@ -156,6 +156,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     let cwd = NSTextField()
     let dynamicCwd = NSButton(checkboxWithTitle: "Ask", target: nil, action: nil)
     var editing: TuiApp?  // app currently loaded in the form (nil = new); drives Launch/Remove/Reveal
+    let updateButton = NSButton()  // toolbar pill, hidden until a newer release is found
+    var availableUpdate: String?
     let tiles = NSStackView()
     let form = NSStackView()
     var saveButton: NSButton?
@@ -239,6 +241,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         cwd.stringValue = FileManager.default.homeDirectoryForCurrentUser.path
         store.migrate()
         reload()
+        checkForUpdates(silent: true)  // passively surface an update in the toolbar
         window.center()
         window.makeKeyAndOrderFront(nil)
     }
@@ -471,6 +474,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         title.font = .systemFont(ofSize: 13, weight: .semibold)
         title.textColor = .secondaryLabelColor
 
+        updateButton.isBordered = false
+        updateButton.wantsLayer = true
+        updateButton.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
+        updateButton.layer?.cornerRadius = 7
+        updateButton.attributedTitle = NSAttributedString(string: "Update", attributes: [
+            .foregroundColor: NSColor.white,
+            .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+        ])
+        updateButton.widthAnchor.constraint(equalToConstant: 62).isActive = true
+        updateButton.heightAnchor.constraint(equalToConstant: 20).isActive = true
+        updateButton.isHidden = true
+        updateButton.target = self
+        updateButton.action = #selector(showUpdateMenu)
+
+        row.addArrangedSubview(updateButton)
         row.addArrangedSubview(title)
         row.addArrangedSubview(icon)
         let pad = NSView()
@@ -560,9 +578,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         alert.runModal()
     }
 
-    // On-demand update: compare the running version to the latest GitHub release; if newer,
-    // drive the canonical installer (which replaces ~/Applications/Termer.app) and relaunch.
-    @objc func checkForUpdates() {
+    // Menu item: loud check (alerts if already current).
+    @objc func checkForUpdates() { checkForUpdates(silent: false) }
+
+    // Compare the running version to the latest GitHub release. If newer, reveal the toolbar
+    // pill (passive); a loud check also alerts when already up to date.
+    func checkForUpdates(silent: Bool) {
         let url = URL(string: "https://api.github.com/repos/usually-frustrated/termer/releases/latest")!
         var req = URLRequest(url: url)
         req.setValue("termer", forHTTPHeaderField: "User-Agent")
@@ -572,28 +593,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
                 .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
                 .flatMap { $0?["tag_name"] as? String }
             DispatchQueue.main.async {
-                guard let tag else { return self.alert("Couldn't check for updates. Check your connection.") }
+                guard let tag else { if !silent { self.alert("Couldn't check for updates. Check your connection.") }; return }
                 let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
                 if latest == Store.version {
-                    self.alert("Termer \(Store.version) is the latest version.")
+                    self.availableUpdate = nil
+                    self.updateButton.isHidden = true
+                    if !silent { self.alert("Termer \(Store.version) is the latest version.") }
                 } else {
-                    self.promptUpdate(latest)
+                    self.availableUpdate = latest
+                    self.updateButton.isHidden = false
+                    self.updateButton.toolTip = "Termer \(latest) is available"
                 }
             }
         }.resume()
     }
 
-    func promptUpdate(_ latest: String) {
-        let a = NSAlert()
-        a.messageText = "Update available"
-        a.informativeText = "Termer \(latest) is available (you have \(Store.version)). Update now?"
-        a.addButton(withTitle: "Update")
-        a.addButton(withTitle: "Later")
-        guard a.runModal() == .alertFirstButtonReturn else { return }
-        runInstaller()
+    // First click on the toolbar pill: show the version. Clicking that item installs.
+    @objc func showUpdateMenu() {
+        guard let latest = availableUpdate else { return }
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Update to \(latest)", action: #selector(runInstaller), keyEquivalent: "")
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: updateButton.bounds.height + 4), in: updateButton)
     }
 
-    func runInstaller() {
+    @objc func runInstaller() {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/zsh")
         p.arguments = ["-lc", "curl -fsSL https://termer.frustrated.dev/install | zsh"]
@@ -620,7 +643,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         let menu = NSMenu()
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates as () -> Void), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Termer", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
