@@ -24,8 +24,9 @@ final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.delegate = self
         app.mainMenu = makeMenu(config.name)
 
-        let terminal = LocalProcessTerminalView(frame: window.contentView?.bounds ?? .zero)
+        let terminal = ThemedTerminalView(frame: window.contentView?.bounds ?? .zero)
         terminal.autoresizingMask = [.width, .height]
+        terminal.applySystemTheme()
         window.contentView = terminal
         self.window = window
         self.terminal = terminal
@@ -79,6 +80,22 @@ final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: expandHome(fallback), isDirectory: true)
         return panel.runModal() == .OK ? panel.url!.path : expandHome(fallback)
+    }
+
+}
+
+final class ThemedTerminalView: LocalProcessTerminalView {
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applySystemTheme()
+    }
+
+    func applySystemTheme() {
+        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        nativeBackgroundColor = dark ? NSColor(red: 0.04, green: 0.04, blue: 0.045, alpha: 1) : NSColor(red: 0.985, green: 0.985, blue: 0.975, alpha: 1)
+        nativeForegroundColor = dark ? NSColor(red: 0.88, green: 0.88, blue: 0.86, alpha: 1) : NSColor(red: 0.12, green: 0.12, blue: 0.115, alpha: 1)
+        layer?.backgroundColor = nativeBackgroundColor.cgColor
+        needsDisplay = true
     }
 }
 
