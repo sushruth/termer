@@ -1,0 +1,237 @@
+# AGENTS.source.md
+
+> ⚠️ **AI AGENTS: DO NOT EDIT `AGENTS.md` DIRECTLY**
+> `AGENTS.md` is auto-generated from this source via REGEN compression rules.
+> Edit `AGENTS.source.md`, then apply the REGEN rules below to compile `AGENTS.md`.
+> Edits to `AGENTS.md` will be overwritten on next regen.
+
+Ponytail stays active for this repo. Minimal, native, boring code wins. Do not add abstractions, dependencies, frameworks, background services, or release infrastructure unless the current feature demonstrably needs them.
+
+## Product Shape
+
+Termer is a native macOS app that creates standalone `.app` wrappers for terminal UI commands.
+
+The important product requirement is process ownership: generated apps must own their terminal window and renderer so Activity Monitor CPU, GPU, and Energy attribution appears under the generated app name, not iTerm, Terminal, Ghostty, Warp, or another external terminal.
+
+External-terminal launchers are not the primary path anymore. They can be useful convenience mode later, but they cannot satisfy resource attribution. Embedded terminal mode is the canonical path.
+
+## Architecture
+
+The repo uses SwiftPM.
+
+- `Termer` is the manager GUI.
+- `TermerRunner` is copied into generated apps and owns the embedded terminal window.
+- SwiftTerm provides the terminal renderer and PTY process runner.
+- Generated apps live in `~/Applications/Termer Apps/`.
+- Generated app config lives inside the generated bundle at `Contents/Resources/config.json`.
+
+Keep this architecture small. The OS gives us PTYs, not an embeddable Terminal.app window. Do not try to make Terminal.app, iTerm, Ghostty, Rio, or Warp look like the owning app; macOS process accounting will still charge the external terminal.
+
+## Build and Release
+
+Always release app changes before telling the user to test with curl.
+
+Build locally:
+
+```bash
+Scripts/package.sh
+```
+
+Release:
+
+```bash
+TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TERMER_NOTARY_PROFILE="termer" Scripts/release.sh vX.Y.Z
+```
+
+Release signs nested binaries first, then signs/notarizes/staples `Termer.app`. If a new executable is added inside the app bundle, sign it before signing the outer app or notarization will fail.
+
+Install/test:
+
+```bash
+curl -fsSL https://termer.sushruth.dev/install | zsh
+```
+
+The installer endpoint resolves the latest GitHub release and redirects to a concrete versioned release asset. Normal app releases do not require a Cloudflare deploy.
+
+Deploy Cloudflare only when changing `Cloudflare/install-worker.js` or `wrangler.toml`:
+
+```bash
+wrangler deploy
+```
+
+## Signing and Notarization
+
+Use Developer ID for public distribution. Apple Development signing is only local/dev signing and is not acceptable for public releases.
+
+Current identity:
+
+```text
+Developer ID Application: Sushruth Sastry (5G2TDMV275)
+```
+
+Current notary profile:
+
+```text
+termer
+```
+
+If notarization fails, read the notary log first:
+
+```bash
+xcrun notarytool log <submission-id> --keychain-profile termer
+```
+
+Common failure already seen: nested `TermerRunner` was not signed with Developer ID, lacked timestamp, and lacked hardened runtime.
+
+## Generated Apps
+
+Generated apps should be real `.app` bundles with their own name, bundle identifier, icon, config, and embedded `TermerRunner`.
+
+Generated apps currently use the Termer icon. Per-app icon support can come later when the GUI needs it.
+
+Bare commands such as `fresh`, `k9s`, or `lazygit` must work from GUI launch. GUI apps do not inherit terminal PATH, so `TermerRunner` launches through `/bin/zsh -lic` to resolve Homebrew, mise, asdf, aliases that become shell commands, and user PATH setup.
+
+Keep shell launch unless it creates a measured problem. Direct exec is cleaner but breaks common user environments.
+
+## Dynamic Folder and Args
+
+The manager has a Folder field and an `Ask` checkbox.
+
+If `Ask` is off, generated app starts in the saved folder.
+
+If `Ask` is on, generated app shows a folder picker before launching. The chosen folder becomes the process working directory.
+
+Args support simple token replacement:
+
+- `{pwd}` → chosen/current working directory
+- `{cwd}` → chosen/current working directory
+- `{name}` → generated app name
+
+Args are currently whitespace-split. This is a known ceiling. Add shellword parsing only when quoted args actually matter.
+
+## UI
+
+Keep UI minimal and native. This is a small utility, not a dashboard.
+
+Current manager surface:
+
+- Saved app picker
+- Name
+- Command
+- Args
+- Folder plus `Ask`
+- Mode: Embedded
+- Save, Launch, Remove, Reveal
+
+Avoid large blank windows, sidebars with empty state, cards, marketing copy, decorative visuals, and custom control styling. Use AppKit controls unless a native control cannot do the job.
+
+Cmd-Q must work in both Termer and generated apps. AppKit needs a real app menu with a Quit item for this.
+
+Closing the last generated app window should terminate normally, not crash or leave a dead process.
+
+## Terminal Theme
+
+Terminal colors should follow macOS appearance and update when the system switches light/dark mode.
+
+Use macOS semantic colors, not hardcoded aesthetic palettes:
+
+- background: `NSColor.textBackgroundColor`
+- foreground: `NSColor.labelColor`
+
+If appearance resolution emits deprecation warnings, clean that before moving on. Do not leave warning debt when the fix is local.
+
+## Installer and Site
+
+Primary installer:
+
+```bash
+curl -fsSL https://termer.sushruth.dev/install | zsh
+```
+
+Site:
+
+```text
+https://termer.sushruth.dev
+```
+
+Cloudflare Worker owns the site and install route. GitHub Releases own binary hosting. Do not move binaries to Cloudflare unless GitHub Releases becomes a real problem.
+
+`/install` means latest. It should avoid stale latest resolution while redirecting to a concrete versioned GitHub release asset so the asset itself can cache normally.
+
+## Docs and Commits
+
+Update docs in the same commit as behavior changes.
+
+Use concise commit messages.
+
+Push after release commits.
+
+Do not release docs-only changes unless the app binary changed.
+
+## Known Ceilings
+
+- Args parsing is whitespace-only.
+- Generated apps use Termer icon.
+- Shell startup is used for PATH correctness.
+- Terminal theme uses semantic foreground/background only, not a full ANSI palette from macOS.
+- SwiftTerm is the only non-stdlib dependency and exists because macOS provides PTYs but no embeddable terminal UI.
+
+Do not fix these speculatively. Fix the first one the user actually hits.
+
+---
+
+## REGEN — Compression Method
+
+### Files
+
+| file | role |
+|------|------|
+| `AGENTS.source.md` | **EDIT THIS** — human-readable, full English prose |
+| `AGENTS.md` | compressed output — symbols only, no sentences |
+
+### Rules
+
+- **AI agents: never edit `AGENTS.md` directly.** It is auto-generated.
+- Edit `AGENTS.source.md`, then compile to `AGENTS.md` via the workflow below.
+- The REGEN section itself is excluded from the compressed output.
+
+### Workflow
+
+Edit this file, then ask the agent to run:
+
+```bash
+claude -p "Read AGENTS.source.md, apply the REGEN compression rules to compress it (exclude REGEN section), write AGENTS.md" --allowedTools 'Read,Edit,Write' --max-turns 10
+```
+
+Compression happens outside session context — costs nothing in tokens.
+
+### Compression Rules
+
+| symbol | meaning |
+|--------|---------|
+| `§` | section heading prefix |
+| `→` | maps to / results in |
+| `←` | derived from |
+| `▸` | list item |
+| `@` | path prefix |
+| `!` | don't / negation prefix |
+| `?` | condition / query |
+| `✓` | correct / yes |
+| `❌` | wrong / no / failure |
+| `💀` | anti-pattern to avoid |
+| `🧠` | thinking / reasoning |
+| `🕳️` | rabbithole |
+| `⏹` | stop |
+| `⚡` | fast / speed up |
+| `↘` | slow down |
+| `⊖` | suppress / remove |
+| `│` | table/data separator |
+
+**Compression approach:**
+- Drop all prose filler, keep only directives
+- Abbreviate common words (impl, config, utils, conv)
+- Symbols replace full phrases
+- Inline code blocks over multi-line
+- No full English sentences — one line per directive
+- Emoji for anti-patterns and concepts where clearer than text
+- Namespace paths with `@` instead of backtick-wrapped text
