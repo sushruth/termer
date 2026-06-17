@@ -39,7 +39,7 @@ async function handle(request) {
   .logo { width: 44px; height: 44px; border-radius: 10px; display: block; margin: 0 0 12px; }
   h1 { font-size: 24px; letter-spacing: 0; margin: 0 0 6px; }
   p { margin: 0 0 14px; color: color-mix(in srgb, CanvasText 68%, Canvas); }
-  .shot { display: block; max-width: 100%; border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.16); margin: 4px 0 18px; }
+  .shot { display: block; max-width: 100%; filter: drop-shadow(0 1px 2px rgba(0,0,0,.1)) drop-shadow(0 8px 20px rgba(0,0,0,.18)); margin: 4px 0 18px; }
   code { display: block; padding: 10px 12px; font-size: 12px; border: 1px solid color-mix(in srgb, CanvasText 14%, Canvas); border-radius: 8px; overflow-x: auto; }
   a { color: LinkText; }
   .gh { display: inline-flex; margin-top: 16px; color: color-mix(in srgb, CanvasText 70%, Canvas); }
