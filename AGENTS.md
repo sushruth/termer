@@ -2,129 +2,187 @@
 // Edit AGENTS.source.md, then apply REGEN compression rules to regen this file.
 
 §PONYTAIL
-Minimal, native, boring code. !abstractions, !deps, !frameworks, !bg services unless demonstrably needed.
+Ponytail active for this repo. Minimal, native, boring code wins. ⊖ abstractions, dependencies, frameworks, background services, release infrastructure unless feature demonstrably needs them.
 
 §PRODUCT
-Native macOS app wraps TUI commands in .app bundles. **Key req:** process ownership — Activity Monitor attributes CPU/GPU/Energy to generated app name, not iTerm/Terminal/Ghostty/Warp. Embedded terminal canonical, !external launchers primary.
+Termer: native macOS app wrapping terminal UI commands as .app bundles.
 
-§ARCH
-▸ Termer → manager GUI
-▸ TermerRunner → embedded in generated apps, owns terminal window
-▸ SwiftTerm → only non-stdlib dep (OS gives PTYs, !embeddable UI)
-▸ Apps @ ~/Applications/Termer\ Apps/
-▸ Config @ app bundle Contents/Resources/config.json
-Keep small. macOS gives PTYs, !Terminal.app emulation, !reskin external terminals.
+▸ Critical: generated apps own terminal window/renderer → Activity Monitor CPU/GPU/Energy → app name, not iTerm/Terminal/Ghostty/Warp/etc.
+▸ External-terminal launchers ≠ primary path. Embedded terminal → canonical.
 
-§BUILD
-Release binary before curl test.
+§ARCHITECTURE
+SwiftPM structure:
+▸ `Termer` = manager GUI
+▸ `TermerRunner` = copied into generated apps, owns embedded terminal window
+▸ SwiftTerm = terminal renderer + PTY
+▸ Generated apps → ~/Applications/Termer Apps/
+▸ Generated app config → Contents/Resources/config.json
 
-Build: `Scripts/package.sh`
-Release: `TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TERMER_NOTARY_PROFILE="termer" Scripts/release.sh vX.Y.Z`
-  ▸ Sign nested binaries first, outer app last (else notary fails)
-  ▸ TERMER_VERSION → CFBundleShortVersionString → manager → builtBy stamp
-  ▸ Build !TERMER_VERSION → "dev"
+Keep small. OS provides PTYs, not embeddable Terminal.app. ⊖ cloning Terminal/iTerm/Ghostty/Rio/Warp appearance.
 
-Install: `curl -fsSL https://termer.frustrated.dev/install | zsh`
+§BUILD & RELEASE
+Local build: `Scripts/package.sh`
 
-Cloudflare (only when @Cloudflare/install-worker.js or wrangler.toml change):
-`wrangler deploy`
+Release:
+```bash
+TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TERMER_NOTARY_PROFILE="termer" Scripts/release.sh vX.Y.Z
+```
 
-§SIGNING
-Developer ID only (public dist). Apple Development !/acceptable.
+Signs nested binaries first → outer app. New executables in bundle → sign before outer sign or notary fails.
+
+`release.sh` → `package.sh` w/ `TERMER_VERSION` → `CFBundleShortVersionString`. Manager reads version → stamps generated apps' `builtBy`. No `TERMER_VERSION` = `dev` stamp.
+
+Install/test:
+```bash
+curl -fsSL https://termer.frustrated.dev/install | zsh
+```
+
+Installer resolves latest GitHub release → concrete versioned asset. Normal releases ≠ Cloudflare deploy needed.
+
+Cloudflare deploy ONLY on `Cloudflare/install-worker.js` or `wrangler.toml` changes:
+```bash
+wrangler deploy
+```
+
+§RELEASE CHECKLIST
+Per release, in order:
+1. Commit work. Update docs w/ behavior. Edit `AGENTS.source.md` (never `AGENTS.md`), regen:
+   ```bash
+   claude -p "Read AGENTS.source.md, apply REGEN compression rules (exclude REGEN), write AGENTS.md. Prepend two-line disclaimer." --allowedTools 'Read,Edit,Write' --max-turns 10
+   ```
+2. Pick version: `gh release list`, bump vX.Y.Z (patch: fixes/tweaks, minor: features). Repo = `usually-frustrated/termer`.
+3. Build, sign, notarize, publish:
+   ```bash
+   TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TERMER_NOTARY_PROFILE="termer" Scripts/release.sh vX.Y.Z
+   ```
+   Runs: `package.sh` → swift build release, copy TermerRunner/AppIcon.icns/bundle, write Info.plist w/ TERMER_VERSION, sign nested→outer. Zips, notarytool submit --wait, stapler staple, gh release create (uploads zip + install.sh). Notary fail → read log.
+4. Push: `git push`
+5. Cloudflare: only if install-worker.js or wrangler.toml changed, run `wrangler deploy`. (Route deletion = dashboard only.)
+6. Site screenshot: UI changed? Recapture `docs/screenshot.png` (active window), `git push`. Raw GitHub serves, no redeploy.
+7. Reach: New version reaches users two ways — generated app bundles auto-regenerate on next launch via `builtBy`; manager app updates on toolbar **Update** pill click / Check for Updates (or curl reinstall).
+
+§SIGNING & NOTARIZATION
+Developer ID for public distribution. Apple Development = local/dev only, ≠ acceptable public releases.
 
 Identity: `Developer ID Application: Sushruth Sastry (5G2TDMV275)`
-Profile: `termer`
+Notary profile: `termer`
 
-Notary fails? `xcrun notarytool log <id> --keychain-profile termer`
-Common fail: TermerRunner !Developer ID signed, !timestamp, !hardened runtime.
+Notary fail → read log:
+```bash
+xcrun notarytool log <submission-id> --keychain-profile termer
+```
 
-§GENERATED_APPS
-Real .app bundles with own name, bundle ID, icon, config, embedded TermerRunner.
+Known: nested `TermerRunner` ≠ Developer ID signed, lacked timestamp, lacked hardened runtime → notary fail.
 
-**Icons:** Icon field → emoji/Unicode glyph, render monochrome on native squircle. Empty → Termer icon. Custom images !yet. Ceiling: setIcon OK local, !distribution → .icns if ever distributed.
+§GENERATED APPS
+Real .app bundles w/ own name, bundle ID, icon, config, embedded TermerRunner.
 
-**builtBy:** config tracks Termer version generated bundle. On launch, regenerate if builtBy ≠ current. !manual re-save after update.
+Icons: form has Icon field → single emoji/Unicode char. Glyph → native rounded-rect (squircle) in manager tiles + generated app Finder icon via `NSWorkspace.setIcon` (xattr). Empty → Termer icon fallback. Custom images = future, not yet built. ⊖ `setIcon` custom icons for distributed apps — use .icns in Resources instead.
 
-**Screenshots:** in-process cacheDisplay (!screen-recording perm) → @~/.thumbs/<slug>.png on first open + quit. Manager reads previews, deletes on Remove. If SwiftTerm Metal renders blank → CGWindowListCreateImage.
+Config records `builtBy` = Termer version (CFBundleShortVersionString, injected by package.sh; "dev" under `swift run`). On launch, manager regenerates bundles where `builtBy` ≠ current version. Stale runners/icons/thumbnails auto-rewrite. No manual re-save post-update.
 
-**Commands:** fresh, k9s, lazygit must work from GUI. GUI !inherit PATH → launch via login shell → resolve Homebrew/mise/asdf/aliases/PATH.
+Screenshots: each generated app captures its terminal window in-process (`cacheDisplay`, no screen-recording permission) → ~/Applications/Termer Apps/.thumbs/<slug>.png. Once on first open (if none exists), again on quit (freshest). Manager reads for card previews, deletes on Remove.
 
-**Shell:** user's login shell from getpwuid (prefer over $SHELL, fallback /bin/zsh). POSIX (zsh/bash) → `-lic "exec <cmd>"` (login+interactive, load profile). Fish → `-l -c "exec <cmd>"` (!-i). !hardcode /bin/zsh.
+Bare commands (`fresh`, `k9s`, `lazygit`) must work from GUI launch. GUI ≠ terminal PATH, so TermerRunner → user login shell to resolve Homebrew/mise/asdf/aliases/PATH.
 
-**Env:** inherit process + TERM=xterm-256color + backfill identity vars (USER/LOGNAME/HOME/SHELL) from getpwuid. GUI !get USER/LOGNAME (login(1) sets in terminal, login shell !set). !bare ["TERM=..."] env (wipes expectations). See inheritedEnvironment().
+Shell = user configured login shell — `getpwuid(getuid()).pw_shell` (Directory Services), prefer over `$SHELL`, fallback `/bin/zsh`. See `userShell()`. POSIX shells (zsh/bash): `-lic "exec <cmd>"` (login+interactive, ~/.zprofile/~/.zshrc / ~/.bash_profile/~/.bashrc load); fish: `-l -c "exec <cmd>"` (no `-i`). ⊖ hardcode `/bin/zsh` — bash/fish user needs their shell + profile.
 
-Keep shell launch unless measured problem. Direct exec cleaner but breaks user envs.
+Runner passes inherited process environment (SSH_AUTH_SOCK etc.) w/ `TERM=xterm-256color`, AND backfills identity vars GUI/launchd missing — USER, LOGNAME, HOME, SHELL — from password DB (getpwuid). See `inheritedEnvironment()`. Matters: GUI launch environment lacks USER/LOGNAME (terminal gets from login(1), login shell ≠ set itself), commands reading process.env.USER break without backfill. ⊖ bare `["TERM=..."]` env (wipes command + ~/.zshrc expectations).
 
-§FOLDER_ARGS
-Ask=off → start in saved folder.
-Ask=on → folder picker → chosen folder → cwd.
+Keep shell launch unless measured problem arises. Direct exec cleaner but breaks common user environments.
 
-Token replacement: {pwd}/{cwd} → cwd, {name} → app name.
-Whitespace-split args (ceiling). Add shellword parsing when quoted args needed.
+§DYNAMIC FOLDER & ARGS
+Manager: Folder field + Ask checkbox.
+
+Ask off → generated app starts in saved folder.
+Ask on → generated app shows folder picker before launch. Chosen folder = process working directory.
+
+Args: simple token replacement:
+▸ {pwd} → chosen/current working directory
+▸ {cwd} → chosen/current working directory
+▸ {name} → generated app name
+
+Currently whitespace-split. Known ceiling. Add shellword parsing when quoted args matter.
 
 §UI
-Minimal, native. Utility, !dashboard.
+Keep minimal, native. Small utility, not dashboard.
 
-Background: Liquid Glass (NSVisualEffectView, .underWindowBackground, behind blend). Tahoe native, !custom chrome.
+Window background: Liquid Glass material (NSVisualEffectView, .underWindowBackground, behind-window blend) — Tahoe native look, not custom chrome.
 
-**Tile screen (primary):**
-▸ Landscape cards (~16:10, terminal aspect)
-▸ Live screenshot (if exists) | monochrome glyph | Termer icon
-▸ Caption below
-▸ Hover brightens (TileButton)
-▸ Same-size + card creates app
-▸ Click card → form
+Manager tile screen:
+▸ One landscape card (~16:10, terminal aspect) per saved app
+▸ Card shows live screenshot of app's terminal (if exists) else monochrome glyph (else Termer icon) + caption
+▸ Cards brighten on hover (TileButton)
+▸ Same-size + card = new app
+▸ Click card = open edit form
+▸ Primary surface = tile screen; form = edit/create. Return rebuilds cards for fresh thumbnails.
 
-**Form (edit/create):**
-▸ ‹ All Apps back button
-▸ Name | Icon (editable combo, any char/emoji, render monochrome) | Command | Args | Folder+Ask | Save/Launch/Remove/Reveal
+Form surface:
+▸ ‹ All Apps back button → tile screen
+▸ Name
+▸ Icon: editable combo of monochrome Unicode presets; any char/emoji can type/paste (rendered monochrome)
+▸ Command
+▸ Args
+▸ Folder + Ask checkbox
+▸ Save, Launch, Remove, Reveal
 
-!Saved picker (!tiles are nav). !Mode control (Embedded only). TuiApp.terminal="Embedded" (config compat); launcher() vestigial.
+No Saved picker (tiles = nav), no Mode control (Embedded only; field disabled). Edited app tracked by `editing` → Launch/Remove/Reveal. TuiApp.terminal stays in struct (always "Embedded") for config compat; external-terminal launcher() = vestigial.
 
-Save enabled !form≠loaded; greys out on save ✓.
+Save enabled only when form ≠ last loaded/saved; greys out after successful save (success signal).
 
-**Titlebar:** text first, app icon last, right-aligned toolbar (padding like window controls). Keep real Termer icon (SwiftPM resource @Sources/Termer/AppIcon.icns, Bundle.module). package.sh copies Termer_Termer.bundle or Bundle.module fatalErrors.
+Titlebar: text first, app icon last, right-aligned in native toolbar w/ padding ≈ window controls. Keep real Termer icon; ⊖ generic SF Symbol. Icon = SwiftPM resource (Sources/Termer/AppIcon.icns), loaded via Bundle.module, shows under `swift run` + packaged app; package.sh must copy Termer_Termer.bundle into app or Bundle.module fatalError.
 
-!large blank windows, !sidebars, !marketing, !decoration. Liquid Glass+thumbnails+hover native+informative, !gradients/illustrations. Tiles → primary launcher, !dashboard. AppKit unless native !suffice.
+▸ ⊖ large blank windows, sidebars w/ empty state, marketing copy, decorative visuals
+▸ Liquid Glass, terminal thumbnails, hover highlights allowed (native materials + functional previews)
+▸ Keep new visuals native+informative, ⊖ gradients/illustrations for their own sake
+▸ Tiles = primary launcher; ⊖ turn app into dashboard
+▸ Use AppKit unless native control can't do job
 
-Cmd-Q → both Termer + generated apps. Real app menu with Quit.
+Cmd-Q works in Termer + generated apps. AppKit needs real app menu w/ Quit.
 
-**Update:** Manager !auto-update (bundles self-regenerate via builtBy).
-  ▸ Launch: silent check Store.version vs latest GitHub tag_name
-  ▸ If newer → accent **Update** pill (controlAccentColor, white text, !bezelColor) in toolbar left of name
-  ▸ Click pill → "Update to vX.Y.Z" menu item → install
-  ▸ App menu: **Check for Updates…** (loud check, alert if current)
-  ▸ Install: canonical installer (curl…/install | zsh, replaces ~/Applications/Termer.app), relaunch (quit + detached open + sleep, else same bundle ID reactivates old)
-  ▸ !background polling — launch check only
+Manager ≠ auto-update (only generated bundles self-regenerate via `builtBy`). Update flow:
+▸ On launch: silent check, Store.version vs latest GitHub release tag_name. If newer → primary accent **Update** pill (layer-backed controlAccentColor, white text, not bezelColor which desaturates inactive) in toolbar brand, left of Termer name.
+▸ Click pill → one-item menu "Update to vX.Y.Z"; click → install.
+▸ App menu: **Check for Updates…** item (loud check — alerts when current).
+▸ Install → canonical installer (curl … /install | zsh, replaces ~/Applications/Termer.app) → relaunch: quit first, detached `open` after short sleep (else `open` same bundle ID just reactivates old instance).
 
-Closing last generated app → normal term, !crash, !zombie.
+⊖ background polling — launch check only.
 
-§TERMINAL_THEME
-Follow macOS appearance, update on light/dark switch.
+Closing last generated app window → terminate normally, ⊖ crash/dead process.
 
-Semantic colors (!hardcoded):
-▸ bg: NSColor.textBackgroundColor
-▸ fg: NSColor.labelColor
+§TERMINAL THEME
+Colors follow macOS appearance, update on light/dark switch.
 
-!Deprecation warnings (fix local if emitted).
+Use macOS semantic colors, ⊖ hardcoded aesthetic palettes:
+▸ background: NSColor.textBackgroundColor
+▸ foreground: NSColor.labelColor
 
-§SITE_INSTALLER
-Installer: `curl -fsSL https://termer.frustrated.dev/install | zsh`
-Site: `https://termer.frustrated.dev`
+Appearance resolution deprecation warnings → clean before moving on. ⊖ warning debt when fix local.
 
-Cloudflare Worker owns site + /install. GitHub Releases owns binaries. !move binaries unless Releases becomes problem.
+§INSTALLER & SITE
+Primary installer:
+```bash
+curl -fsSL https://termer.frustrated.dev/install | zsh
+```
 
-/install → latest; avoid stale latest; redirect to concrete versioned asset (asset caches normally).
+Site: https://termer.frustrated.dev
 
-§DOCS_COMMITS
-Update docs in same commit as behavior changes. Concise messages. Push after release. !docs-only releases unless binary changed.
+Cloudflare Worker = site + install route. GitHub Releases = binary hosting. ⊖ move binaries to Cloudflare unless GitHub Releases becomes real problem.
 
-§CEILINGS
-▸ Args whitespace-split only
-▸ Icons emoji/Unicode via setIcon (!custom images, !.icns unless distribution)
-▸ Shell startup for PATH correctness
-▸ Theme semantic only (!full ANSI palette)
-▸ SwiftTerm !non-stdlib dep (OS gives PTYs, !embeddable UI)
-▸ Screenshots in-process cacheDisplay (!perm)
+`/install` = latest. Should avoid stale latest resolution while redirecting to concrete versioned GitHub release asset (asset itself can cache normally).
 
-💀 Speculative fixes. Fix first one user hits.
+§DOCS & COMMITS
+Update docs in same commit as behavior changes.
+Use concise commit messages.
+Push after release commits.
+⊖ release docs-only changes unless app binary changed.
+
+§KNOWN CEILINGS
+▸ Args parsing = whitespace only
+▸ Per-app icons = emoji/Unicode via NSWorkspace.setIcon (xattr); ⊖ custom images, ⊖ .icns generation (won't survive distribution)
+▸ Shell startup = PATH correctness
+▸ Terminal theme = semantic foreground/background only, not full ANSI palette from macOS
+▸ SwiftTerm = only non-stdlib dependency (OS provides PTYs, ⊖ embeddable terminal UI)
+▸ Terminal thumbnails = in-process cacheDisplay (no permission); if SwiftTerm Metal-renders + shots blank → switch CGWindowListCreateImage
+
+⊖ fix speculatively. Fix first one user hits.

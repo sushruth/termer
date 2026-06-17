@@ -61,6 +61,25 @@ Deploy Cloudflare only when changing `Cloudflare/install-worker.js` or `wrangler
 wrangler deploy
 ```
 
+### Per-release checklist
+
+Do these in order for every release:
+
+1. **Commit the work.** Update docs in the same commit as the behavior change. Edit `AGENTS.source.md` (never `AGENTS.md` by hand), then regenerate `AGENTS.md`:
+   ```bash
+   claude -p "Read AGENTS.source.md, apply the REGEN compression rules to compress it (exclude REGEN section), write AGENTS.md. Always prepend the two-line auto-generated disclaimer at the very top." --allowedTools 'Read,Edit,Write' --max-turns 10
+   ```
+2. **Pick the next version.** Check `gh release list` and bump `vX.Y.Z` (patch for fixes/tweaks, minor for features). Repo is `usually-frustrated/termer` (gh auto-detects it from the remote).
+3. **Build, sign, notarize, publish** in one shot:
+   ```bash
+   TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TERMER_NOTARY_PROFILE="termer" Scripts/release.sh vX.Y.Z
+   ```
+   This runs `package.sh` (`swift build -c release`; copies `TermerRunner`, `AppIcon.icns`, and `Termer_Termer.bundle`; writes `Info.plist` with `TERMER_VERSION`→`CFBundleShortVersionString`; signs nested-then-outer), zips, `notarytool submit --wait`, `stapler staple`, and `gh release create` (uploads the zip + `install.sh`). On notary failure read the log first (see Signing section).
+4. **Push commits:** `git push`.
+5. **Cloudflare:** only if `Cloudflare/install-worker.js` or `wrangler.toml` changed, run `wrangler deploy`. (Route deletion has no wrangler command — do it in the dashboard.)
+6. **Site screenshot:** if the UI changed and you want the site to reflect it, recapture `docs/screenshot.png` (active window — see the screenshot note) and `git push`; raw GitHub serves it, no redeploy needed.
+7. **Reach:** the new version reaches users two ways — generated app bundles auto-regenerate on next launch via `builtBy`; the manager app itself only updates when the user clicks the toolbar **Update** pill / Check for Updates (or reinstalls via curl).
+
 ## Signing and Notarization
 
 Use Developer ID for public distribution. Apple Development signing is only local/dev signing and is not acceptable for public releases.
