@@ -91,9 +91,11 @@ final class ThemedTerminalView: LocalProcessTerminalView {
     }
 
     func applySystemTheme() {
-        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        nativeBackgroundColor = dark ? NSColor(red: 0.04, green: 0.04, blue: 0.045, alpha: 1) : NSColor(red: 0.985, green: 0.985, blue: 0.975, alpha: 1)
-        nativeForegroundColor = dark ? NSColor(red: 0.88, green: 0.88, blue: 0.86, alpha: 1) : NSColor(red: 0.12, green: 0.12, blue: 0.115, alpha: 1)
+        let old = NSAppearance.current
+        NSAppearance.current = effectiveAppearance
+        nativeBackgroundColor = NSColor.textBackgroundColor
+        nativeForegroundColor = NSColor.labelColor
+        NSAppearance.current = old
         layer?.backgroundColor = nativeBackgroundColor.cgColor
         needsDisplay = true
     }
