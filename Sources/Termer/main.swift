@@ -116,31 +116,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     let args = NSTextField()
     let cwd = NSTextField()
     let terminal = NSPopUpButton()
+    let appPicker = NSPopUpButton()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 280),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 430, height: 280),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
         window.title = "Termer"
-        window.minSize = NSSize(width: 500, height: 260)
+        window.minSize = NSSize(width: 430, height: 280)
         app.mainMenu = makeMenu()
 
         let root = NSStackView()
-        root.orientation = .horizontal
-        root.alignment = .top
-        root.spacing = 14
-        root.edgeInsets = NSEdgeInsets(top: 18, left: 18, bottom: 18, right: 18)
+        root.orientation = .vertical
+        root.alignment = .leading
+        root.spacing = 8
+        root.edgeInsets = NSEdgeInsets(top: 18, left: 20, bottom: 18, right: 20)
         window.contentView = root
 
         table.addTableColumn(NSTableColumn(identifier: .init("name")))
         table.headerView = nil
         table.dataSource = self
         table.delegate = self
-        let scroll = NSScrollView()
-        scroll.documentView = table
-        scroll.hasVerticalScroller = true
-        scroll.widthAnchor.constraint(equalToConstant: 130).isActive = true
-        root.addArrangedSubview(scroll)
 
         let form = NSStackView()
         form.orientation = .vertical
@@ -148,6 +144,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         form.alignment = .leading
         root.addArrangedSubview(form)
 
+        appPicker.target = self
+        appPicker.action = #selector(pickApp)
+        addRow("Saved", appPicker, form)
         addRow("Name", name, form)
         addRow("Command", command, form)
         addRow("Args", args, form)
@@ -160,9 +159,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         for (title, action) in [("Save", #selector(save)), ("Launch", #selector(launch)), ("Remove", #selector(remove)), ("Reveal", #selector(reveal))] {
             let button = NSButton(title: title, target: self, action: action)
             button.bezelStyle = .rounded
+            if title == "Save" { button.keyEquivalent = "\r" }
             buttons.addArrangedSubview(button)
         }
-        form.addArrangedSubview(buttons)
+        addButtonRow(buttons, form)
 
         cwd.stringValue = FileManager.default.homeDirectoryForCurrentUser.path
         reload()
@@ -183,6 +183,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         show(apps[table.selectedRow])
     }
 
+    @objc func pickApp() {
+        guard appPicker.indexOfSelectedItem > 0 else { return }
+        show(apps[appPicker.indexOfSelectedItem - 1])
+    }
+
     @objc func save() {
         guard !name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return alert("Name is required.") }
         guard !command.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return alert("Command is required.") }
@@ -198,14 +203,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     }
 
     var selected: TuiApp? {
-        table.selectedRow >= 0 && table.selectedRow < apps.count ? apps[table.selectedRow] : nil
+        let i = appPicker.indexOfSelectedItem - 1
+        return i >= 0 && i < apps.count ? apps[i] : nil
     }
 
     func reload(selecting selectedName: String? = nil) {
         apps = store.load()
         table.reloadData()
+        appPicker.removeAllItems()
+        appPicker.addItem(withTitle: "New App")
+        appPicker.addItems(withTitles: apps.map(\.name))
         if let selectedName, let row = apps.firstIndex(where: { $0.name == selectedName }) {
             table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            appPicker.selectItem(at: row + 1)
         }
     }
 
@@ -228,6 +238,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         field.widthAnchor.constraint(equalToConstant: 250).isActive = true
         row.addArrangedSubview(l)
         row.addArrangedSubview(field)
+        stack.addArrangedSubview(row)
+    }
+
+    func addButtonRow(_ buttons: NSView, _ stack: NSStackView) {
+        let row = NSStackView()
+        row.spacing = 8
+        let spacer = NSView()
+        spacer.widthAnchor.constraint(equalToConstant: 68).isActive = true
+        row.addArrangedSubview(spacer)
+        row.addArrangedSubview(buttons)
         stack.addArrangedSubview(row)
     }
 
