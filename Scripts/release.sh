@@ -11,7 +11,7 @@ if ! security find-identity -v -p codesigning | grep -q "$identity"; then
   exit 1
 fi
 
-TERMER_SIGN_IDENTITY="$identity" Scripts/package.sh >/dev/null
+TERMER_SIGN_IDENTITY="$identity" TERMER_VERSION="$version" Scripts/package.sh >/dev/null
 ditto -c -k --keepParent .build/Termer.app ".build/Termer-$version.zip"
 
 xcrun notarytool submit ".build/Termer-$version.zip" --keychain-profile "$profile" --wait

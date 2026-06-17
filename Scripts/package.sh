@@ -3,6 +3,8 @@ set -euo pipefail
 
 swift build -c release
 
+version="${TERMER_VERSION:-dev}"
+version="${version#v}"
 app=".build/Termer.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS"
@@ -12,7 +14,7 @@ cp ".build/release/TermerRunner" "$app/Contents/MacOS/TermerRunner"
 cp "icons/macos/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
 # SwiftPM resource bundle (holds AppIcon.icns for Bundle.module); Bundle.module fatalErrors if absent.
 cp -R ".build/release/Termer_Termer.bundle" "$app/Contents/Resources/"
-cat > "$app/Contents/Info.plist" <<'PLIST'
+cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -22,6 +24,7 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
   <key>CFBundleDisplayName</key><string>Termer</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>$version</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict></plist>
 PLIST

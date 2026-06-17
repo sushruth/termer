@@ -9,9 +9,13 @@ struct TuiApp: Codable {
     var terminal: String
     var dynamicCwd: Bool?
     var icon: String?
+    var builtBy: String?  // Termer version that generated this bundle; triggers regen on update
 }
 
 final class Store {
+    // The running manager's version (set by package.sh); "dev" under `swift run`.
+    static let version = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "dev"
+
     let root = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Applications/Termer Apps", isDirectory: true)
 
@@ -29,10 +33,19 @@ final class Store {
     }
 
     func save(_ app: TuiApp) throws {
+        var app = app
+        app.builtBy = Self.version
         try FileManager.default.createDirectory(at: configs, withIntermediateDirectories: true)
         try makeBundle(app)
         let data = try JSONEncoder().encode(app)
         try data.write(to: configs.appendingPathComponent(slug(app.name) + ".json"))
+    }
+
+    // Regenerate bundles built by an older Termer (stale runner/icon/thumbnail code).
+    func migrate() {
+        for app in load() where app.builtBy != Self.version {
+            try? save(app)
+        }
     }
 
     func remove(_ app: TuiApp) throws {
@@ -230,6 +243,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         addButtonRow(buttons, form)
 
         cwd.stringValue = FileManager.default.homeDirectoryForCurrentUser.path
+        store.migrate()
         reload()
         window.center()
         window.makeKeyAndOrderFront(nil)

@@ -45,6 +45,8 @@ TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TE
 
 Release signs nested binaries first, then signs/notarizes/staples `Termer.app`. If a new executable is added inside the app bundle, sign it before signing the outer app or notarization will fail.
 
+`release.sh` passes the tag to `package.sh` as `TERMER_VERSION`, which writes it into `CFBundleShortVersionString`. The manager reads that as its version and stamps generated apps' `builtBy`, so the version must flow through on every release — a build without `TERMER_VERSION` is stamped `dev`.
+
 Install/test:
 
 ```bash
@@ -88,6 +90,8 @@ Common failure already seen: nested `TermerRunner` was not signed with Developer
 Generated apps should be real `.app` bundles with their own name, bundle identifier, icon, config, and embedded `TermerRunner`.
 
 Per-app icons: the form has an Icon field accepting a single emoji or Unicode character. The glyph is rendered onto a native rounded-rect (squircle) tile — both in the manager's tile grid and as the generated app's Finder icon via `NSWorkspace.setIcon` (xattr custom icon). Empty Icon falls back to the Termer app icon. Custom image files remain a possible future need, not yet built. Known ceiling: `setIcon` custom icons are fine for locally generated apps but won't survive distribution — switch to a generated `.icns` in Resources if generated apps ever get distributed.
+
+Each generated app's config records `builtBy` — the Termer version (`CFBundleShortVersionString`, injected by `package.sh`; `"dev"` under `swift run`) that generated the bundle. On launch the manager regenerates every bundle whose `builtBy` differs from the current version, so updating Termer transparently rewrites stale runners/icons/thumbnail code in already-installed apps. No manual re-save needed after an update.
 
 Each generated app captures a screenshot of its own terminal window (in-process `cacheDisplay`, no screen-recording permission) and writes it to `~/Applications/Termer Apps/.thumbs/<slug>.png` — once on first open if none exists yet, and again on quit (freshest state). The manager reads these for the card previews and deletes them on Remove.
 
@@ -214,6 +218,12 @@ Do not fix these speculatively. Fix the first one the user actually hits.
 - **AI agents: never edit `AGENTS.md` directly.** It is auto-generated.
 - Edit `AGENTS.source.md`, then compile to `AGENTS.md` via the workflow below.
 - The REGEN section itself is excluded from the compressed output.
+- **Always** prepend this exact two-line disclaimer to the top of the compiled `AGENTS.md` (before any compressed content):
+
+  ```
+  // THIS FILE IS AUTO-GENERATED FROM AGENTS.source.md — DO NOT EDIT DIRECTLY.
+  // Edit AGENTS.source.md, then apply REGEN compression rules to regen this file.
+  ```
 
 ### Workflow
 
