@@ -95,7 +95,9 @@ Each generated app's config records `builtBy` — the Termer version (`CFBundleS
 
 Each generated app captures a screenshot of its own terminal window (in-process `cacheDisplay`, no screen-recording permission) and writes it to `~/Applications/Termer Apps/.thumbs/<slug>.png` — once on first open if none exists yet, and again on quit (freshest state). The manager reads these for the card previews and deletes them on Remove.
 
-Bare commands such as `fresh`, `k9s`, or `lazygit` must work from GUI launch. GUI apps do not inherit terminal PATH, so `TermerRunner` launches through `/bin/zsh -lic` to resolve Homebrew, mise, asdf, aliases that become shell commands, and user PATH setup.
+Bare commands such as `fresh`, `k9s`, or `lazygit` must work from GUI launch. GUI apps do not inherit terminal PATH, so `TermerRunner` launches the command through the user's login shell to resolve Homebrew, mise, asdf, aliases, and user PATH setup.
+
+The shell is the user's configured login shell — `getpwuid(getuid()).pw_shell` (Directory Services), preferring that over `$SHELL`, falling back to `/bin/zsh` — see `userShell()`. POSIX shells (zsh/bash) run `-lic "exec <cmd>"` (login + interactive, so `~/.zprofile`/`~/.zshrc` / `~/.bash_profile`/`~/.bashrc` load); fish runs `-l -c "exec <cmd>"` (no `-i` flag). Do not hardcode `/bin/zsh` — a bash/fish user must get their own shell and profile.
 
 The runner passes the inherited process environment (so `USER`, `HOME`, `LOGNAME`, `SSH_AUTH_SOCK`, etc. are present) with `TERM=xterm-256color` added — see `inheritedEnvironment()`. Do not pass a bare `["TERM=..."]` env; that wipes everything the command and the user's `~/.zshrc` expect.
 

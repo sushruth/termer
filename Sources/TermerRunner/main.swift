@@ -41,10 +41,14 @@ final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let args = render(config.args, name: config.name, cwd: cwd)
         let commandLine = ([config.command] + splitArgs(args)).map(sh).joined(separator: " ")
 
-        // ponytail: shell resolves PATH/mise/asdf/homebrew. Direct exec later only if shell startup becomes a real problem.
+        // Use the user's configured login shell so their real profile/rc loads and resolves
+        // PATH/mise/asdf/homebrew/aliases. fish takes a different flag set than POSIX shells.
+        let shell = userShell()
+        let isFish = (shell as NSString).lastPathComponent == "fish"
+        let shellArgs = isFish ? ["-l", "-c", "exec \(commandLine)"] : ["-lic", "exec \(commandLine)"]
         terminal.startProcess(
-            executable: "/bin/zsh",
-            args: ["-lic", "exec \(commandLine)"],
+            executable: shell,
+            args: shellArgs,
             environment: inheritedEnvironment(),
             execName: config.name,
             currentDirectory: cwd
@@ -132,8 +136,19 @@ func slug(_ s: String) -> String {
     s.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "-" }
 }
 
+// The user's configured login shell (Directory Services pw_shell), preferred over $SHELL,
+// falling back to zsh. So a bash/fish user gets their own shell + profile, not a hardcoded zsh.
+func userShell() -> String {
+    if let pw = getpwuid(getuid()), let cString = pw.pointee.pw_shell {
+        let path = String(cString: cString)
+        if !path.isEmpty { return path }
+    }
+    let envShell = ProcessInfo.processInfo.environment["SHELL"] ?? ""
+    return envShell.isEmpty ? "/bin/zsh" : envShell
+}
+
 // Inherit the GUI launch environment (USER, HOME, LOGNAME, SSH_AUTH_SOCK, …) so commands that
-// need them work; the `-lic` login+interactive shell then layers on ~/.zprofile and ~/.zshrc.
+// need them work; the login+interactive shell then layers on the user's profile/rc.
 func inheritedEnvironment() -> [String] {
     var env = ProcessInfo.processInfo.environment
     env["TERM"] = "xterm-256color"
