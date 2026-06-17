@@ -7,6 +7,7 @@ struct Config: Codable {
     var command: String
     var args: String
     var cwd: String
+    var dynamicCwd: Bool?
 }
 
 @MainActor
@@ -33,7 +34,9 @@ final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        let commandLine = ([config.command] + splitArgs(config.args)).map(sh).joined(separator: " ")
+        let cwd = config.dynamicCwd == true ? chooseFolder(fallback: config.cwd) : expandHome(config.cwd)
+        let args = render(config.args, name: config.name, cwd: cwd)
+        let commandLine = ([config.command] + splitArgs(args)).map(sh).joined(separator: " ")
 
         // ponytail: shell resolves PATH/mise/asdf/homebrew. Direct exec later only if shell startup becomes a real problem.
         terminal.startProcess(
@@ -41,7 +44,7 @@ final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
             args: ["-lic", "exec \(commandLine)"],
             environment: ["TERM=xterm-256color"],
             execName: config.name,
-            currentDirectory: expandHome(config.cwd)
+            currentDirectory: cwd
         )
     }
 
@@ -68,6 +71,15 @@ final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
         menu.addItem(appMenuItem)
         return menu
     }
+
+    func chooseFolder(fallback: String) -> String {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: expandHome(fallback), isDirectory: true)
+        return panel.runModal() == .OK ? panel.url!.path : expandHome(fallback)
+    }
 }
 
 func splitArgs(_ s: String) -> [String] {
@@ -80,6 +92,12 @@ func expandHome(_ s: String) -> String {
 
 func sh(_ s: String) -> String {
     "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+}
+
+func render(_ s: String, name: String, cwd: String) -> String {
+    s.replacingOccurrences(of: "{name}", with: name)
+     .replacingOccurrences(of: "{pwd}", with: cwd)
+     .replacingOccurrences(of: "{cwd}", with: cwd)
 }
 
 let app = NSApplication.shared

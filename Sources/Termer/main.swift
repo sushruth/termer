@@ -7,6 +7,7 @@ struct TuiApp: Codable {
     var args: String
     var cwd: String
     var terminal: String
+    var dynamicCwd: Bool?
 }
 
 final class Store {
@@ -56,6 +57,9 @@ final class Store {
         try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
 
         try FileManager.default.copyItem(at: runnerURL(), to: macOS.appendingPathComponent("TermerRunner"))
+        if let icon = Bundle.main.resourceURL?.appendingPathComponent("AppIcon.icns"), FileManager.default.fileExists(atPath: icon.path) {
+            try FileManager.default.copyItem(at: icon, to: resources.appendingPathComponent("AppIcon.icns"))
+        }
         try JSONEncoder().encode(app).write(to: resources.appendingPathComponent("config.json"))
         try plist(app).write(to: contents.appendingPathComponent("Info.plist"), atomically: true, encoding: .utf8)
         _ = run("/usr/bin/codesign", ["--force", "--sign", "-", bundle.path])
@@ -104,6 +108,7 @@ final class Store {
           <key>CFBundleIdentifier</key><string>local.termer.\(slug(app.name))</string>
           <key>CFBundleName</key><string>\(xml(app.name))</string>
           <key>CFBundleDisplayName</key><string>\(xml(app.name))</string>
+          <key>CFBundleIconFile</key><string>AppIcon</string>
           <key>CFBundlePackageType</key><string>APPL</string>
           <key>LSMinimumSystemVersion</key><string>14.0</string>
         </dict></plist>
@@ -120,6 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     let command = NSTextField()
     let args = NSTextField()
     let cwd = NSTextField()
+    let dynamicCwd = NSButton(checkboxWithTitle: "Ask", target: nil, action: nil)
     let terminal = NSPopUpButton()
     let appPicker = NSPopUpButton()
 
@@ -197,7 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     @objc func save() {
         guard !name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return alert("Name is required.") }
         guard !command.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return alert("Command is required.") }
-        let app = TuiApp(name: name.stringValue, command: command.stringValue, args: args.stringValue, cwd: cwd.stringValue, terminal: terminal.titleOfSelectedItem ?? "Ghostty")
+        let app = TuiApp(name: name.stringValue, command: command.stringValue, args: args.stringValue, cwd: cwd.stringValue, terminal: terminal.titleOfSelectedItem ?? "Embedded", dynamicCwd: dynamicCwd.state == .on)
         do { try store.save(app); reload(selecting: app.name) } catch { alert(error.localizedDescription) }
     }
 
@@ -230,6 +236,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         command.stringValue = app.command
         args.stringValue = app.args
         cwd.stringValue = app.cwd
+        dynamicCwd.state = app.dynamicCwd == true ? .on : .off
+        updateFolderEnabled()
         terminal.selectItem(withTitle: app.terminal)
     }
 
@@ -267,11 +275,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         l.widthAnchor.constraint(equalToConstant: 68).isActive = true
         let choose = NSButton(title: "Choose...", target: self, action: #selector(chooseFolder))
         choose.bezelStyle = .rounded
+        dynamicCwd.target = self
+        dynamicCwd.action = #selector(toggleDynamicCwd)
         cwd.widthAnchor.constraint(equalToConstant: 160).isActive = true
         row.addArrangedSubview(l)
         row.addArrangedSubview(cwd)
         row.addArrangedSubview(choose)
+        row.addArrangedSubview(dynamicCwd)
         stack.addArrangedSubview(row)
+    }
+
+    @objc func toggleDynamicCwd() {
+        updateFolderEnabled()
+    }
+
+    func updateFolderEnabled() {
+        cwd.isEnabled = dynamicCwd.state != .on
     }
 
     @objc func chooseFolder() {
