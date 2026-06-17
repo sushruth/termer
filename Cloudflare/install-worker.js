@@ -1,10 +1,17 @@
 addEventListener("fetch", event => {
   const url = new URL(event.request.url)
   if (url.pathname === "/install" || url.pathname === "/install.sh") {
-    event.respondWith(Response.redirect(
-      "https://github.com/sushruth/termer/releases/latest/download/install.sh",
-      302
-    ))
+    event.respondWith(fetch("https://github.com/sushruth/termer/releases/latest/download/install.sh", {
+      headers: { "Cache-Control": "no-cache" },
+      cf: { cacheTtl: 0, cacheEverything: false }
+    }).then(response => response.text()).then(body => new Response(body, {
+      headers: {
+        "content-type": "application/x-sh; charset=utf-8",
+        "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+        "pragma": "no-cache",
+        "expires": "0"
+      }
+    })))
     return
   }
 
@@ -33,6 +40,9 @@ addEventListener("fetch", event => {
   <code>curl -fsSL https://termer.sushruth.dev/install | zsh</code>
   <p><a href="https://github.com/sushruth/termer">GitHub</a></p>
 </main>`, {
-    headers: { "content-type": "text/html; charset=utf-8" }
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store, no-cache, must-revalidate, max-age=0"
+    }
   }))
 })
