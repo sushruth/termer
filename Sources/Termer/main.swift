@@ -123,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
                               backing: .buffered, defer: false)
         window.title = "Termer"
         window.minSize = NSSize(width: 500, height: 260)
+        app.mainMenu = makeMenu()
 
         let root = NSStackView()
         root.orientation = .horizontal
@@ -261,6 +262,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         let alert = NSAlert()
         alert.messageText = message
         alert.runModal()
+    }
+
+    func makeMenu() -> NSMenu {
+        let menu = NSMenu()
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Quit Termer", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenuItem.submenu = appMenu
+        menu.addItem(appMenuItem)
+        return menu
     }
 }
 
