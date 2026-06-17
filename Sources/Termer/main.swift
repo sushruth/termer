@@ -356,10 +356,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     }
 
     func appTile(_ app: TuiApp, _ index: Int) -> NSView {
+        let glyph = app.icon?.trimmingCharacters(in: .whitespaces) ?? ""
+        let caption = glyph.isEmpty ? app.name : "\(glyph)  \(app.name)"
         if let thumb = thumbImage(app) {
-            return tile(thumb, fills: true, app.name, #selector(pickTile), index)
+            return tile(thumb, fills: true, caption, #selector(pickTile), index)
         }
-        return tile(iconImage(app.icon, size: 44) ?? termerIcon(), fills: false, app.name, #selector(pickTile), index)
+        return tile(iconImage(app.icon, size: 44) ?? termerIcon(), fills: false, caption, #selector(pickTile), index)
     }
 
     func plusTile() -> NSView {
