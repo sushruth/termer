@@ -87,7 +87,9 @@ Common failure already seen: nested `TermerRunner` was not signed with Developer
 
 Generated apps should be real `.app` bundles with their own name, bundle identifier, icon, config, and embedded `TermerRunner`.
 
-Generated apps currently use the Termer icon. Per-app icon support can come later when the GUI needs it.
+Per-app icons: the form has an Icon field accepting a single emoji or Unicode character. The glyph is rendered onto a native rounded-rect (squircle) tile — both in the manager's tile grid and as the generated app's Finder icon via `NSWorkspace.setIcon` (xattr custom icon). Empty Icon falls back to the Termer app icon. Custom image files remain a possible future need, not yet built. Known ceiling: `setIcon` custom icons are fine for locally generated apps but won't survive distribution — switch to a generated `.icns` in Resources if generated apps ever get distributed.
+
+Each generated app captures a screenshot of its own terminal window (in-process `cacheDisplay`, no screen-recording permission) and writes it to `~/Applications/Termer Apps/.thumbs/<slug>.png` — once on first open if none exists yet, and again on quit (freshest state). The manager reads these for the card previews and deletes them on Remove.
 
 Bare commands such as `fresh`, `k9s`, or `lazygit` must work from GUI launch. GUI apps do not inherit terminal PATH, so `TermerRunner` launches through `/bin/zsh -lic` to resolve Homebrew, mise, asdf, aliases that become shell commands, and user PATH setup.
 
@@ -113,17 +115,34 @@ Args are currently whitespace-split. This is a known ceiling. Add shellword pars
 
 Keep UI minimal and native. This is a small utility, not a dashboard.
 
-Current manager surface:
+The window background is a Liquid Glass material (`NSVisualEffectView`, `.underWindowBackground`, behind-window blend) — the Tahoe-era native look, not custom chrome.
 
+Current manager starts on a centered tile screen:
+
+- One landscape card (~16:10, the terminal's aspect) per saved app.
+- Each card shows a live screenshot of that app's terminal when one exists, else the app's monochrome glyph (else the Termer icon), with a caption below.
+- Cards brighten on hover (`TileButton`).
+- A same-size `+` card creates a new app.
+- Clicking a card opens the form for that app.
+- The card screen is the primary surface; the form is the edit/create surface. Returning to it rebuilds the cards so freshly captured thumbnails appear.
+
+Current form surface:
+
+- `‹ All Apps` back button (returns to the tile screen)
 - Saved app picker
 - Name
+- Icon: editable combo box of monochrome Unicode glyph presets; any character/emoji can be typed or pasted (rendered monochrome regardless)
 - Command
 - Args
 - Folder plus `Ask`
 - Mode: Embedded
 - Save, Launch, Remove, Reveal
 
-Avoid large blank windows, sidebars with empty state, cards, marketing copy, decorative visuals, and custom control styling. Use AppKit controls unless a native control cannot do the job.
+Save is enabled only when the form differs from the last loaded/saved state; it greys out again after a successful save (the success signal).
+
+Titlebar brand is text first, app icon last, right-aligned in the native toolbar with padding comparable to the window controls. Keep the actual Termer app icon there; do not replace it with a generic SF Symbol. The icon is a SwiftPM resource (`Sources/Termer/AppIcon.icns`) loaded via `Bundle.module`, so it shows under `swift run` and in the packaged app; `package.sh` must copy `Termer_Termer.bundle` into the app or `Bundle.module` will `fatalError`.
+
+Avoid large blank windows, sidebars with empty state, marketing copy, and purely decorative visuals. The Liquid Glass background, terminal thumbnails, and hover highlights are allowed because they are native materials and functional previews, not ornamentation — keep new visuals in that spirit (native + informative), not gradients/illustrations for their own sake. Tile cards are the primary launcher surface; do not turn the app into a dashboard. Use AppKit controls unless a native control cannot do the job.
 
 Cmd-Q must work in both Termer and generated apps. AppKit needs a real app menu with a Quit item for this.
 
@@ -171,10 +190,11 @@ Do not release docs-only changes unless the app binary changed.
 ## Known Ceilings
 
 - Args parsing is whitespace-only.
-- Generated apps use Termer icon.
+- Per-app icons are emoji/Unicode glyphs via `NSWorkspace.setIcon` (xattr); no custom image files, no `.icns` generation (won't survive distribution).
 - Shell startup is used for PATH correctness.
 - Terminal theme uses semantic foreground/background only, not a full ANSI palette from macOS.
 - SwiftTerm is the only non-stdlib dependency and exists because macOS provides PTYs but no embeddable terminal UI.
+- Terminal thumbnails use in-process `cacheDisplay` (no permission); if SwiftTerm ever renders via Metal and shots come out blank, switch to `CGWindowListCreateImage`.
 
 Do not fix these speculatively. Fix the first one the user actually hits.
 

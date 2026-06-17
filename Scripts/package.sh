@@ -10,6 +10,8 @@ mkdir -p "$app/Contents/Resources"
 cp ".build/release/Termer" "$app/Contents/MacOS/Termer"
 cp ".build/release/TermerRunner" "$app/Contents/MacOS/TermerRunner"
 cp "icons/macos/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
+# SwiftPM resource bundle (holds AppIcon.icns for Bundle.module); Bundle.module fatalErrors if absent.
+cp -R ".build/release/Termer_Termer.bundle" "$app/Contents/Resources/"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

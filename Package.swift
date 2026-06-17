@@ -8,7 +8,7 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", branch: "main")
     ],
     targets: [
-        .executableTarget(name: "Termer"),
+        .executableTarget(name: "Termer", resources: [.copy("AppIcon.icns")]),
         .executableTarget(name: "TermerRunner", dependencies: ["SwiftTerm"])
     ]
 )

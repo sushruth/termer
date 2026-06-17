@@ -14,9 +14,11 @@ struct Config: Codable {
 final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var window: NSWindow?
     var terminal: LocalProcessTerminalView?
+    var appName = ""
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let config = loadConfig()
+        appName = config.name
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 560),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
@@ -47,6 +49,11 @@ final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
             execName: config.name,
             currentDirectory: cwd
         )
+
+        // Seed a thumbnail on first open (when none exists yet); quit refreshes it.
+        if !FileManager.default.fileExists(atPath: thumbURL(appName).path) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.captureThumbnail() }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -54,7 +61,20 @@ final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        captureThumbnail()
         NSApp.terminate(nil)
+    }
+
+    // ponytail: in-process cacheDisplay snapshot (no screen-recording permission). If SwiftTerm
+    // ever renders via Metal and this comes out blank, switch to CGWindowListCreateImage.
+    func captureThumbnail() {
+        guard let view = window?.contentView, view.bounds.width > 1,
+              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        guard let png = rep.representation(using: .png, properties: [:]) else { return }
+        let url = thumbURL(appName)
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? png.write(to: url)
     }
 
     func loadConfig() -> Config {
@@ -99,6 +119,17 @@ final class ThemedTerminalView: LocalProcessTerminalView {
         layer?.backgroundColor = nativeBackgroundColor.cgColor
         needsDisplay = true
     }
+}
+
+// Shared with the manager: ~/Applications/Termer Apps/.thumbs/<slug>.png
+func thumbURL(_ name: String) -> URL {
+    FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Applications/Termer Apps/.thumbs", isDirectory: true)
+        .appendingPathComponent(slug(name) + ".png")
+}
+
+func slug(_ s: String) -> String {
+    s.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "-" }
 }
 
 func splitArgs(_ s: String) -> [String] {
