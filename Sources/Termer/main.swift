@@ -118,15 +118,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     let terminal = NSPopUpButton()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 430),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 280),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered, defer: false)
         window.title = "Termer"
+        window.minSize = NSSize(width: 500, height: 260)
 
         let root = NSStackView()
         root.orientation = .horizontal
-        root.spacing = 16
-        root.edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
+        root.alignment = .top
+        root.spacing = 14
+        root.edgeInsets = NSEdgeInsets(top: 18, left: 18, bottom: 18, right: 18)
         window.contentView = root
 
         table.addTableColumn(NSTableColumn(identifier: .init("name")))
@@ -136,12 +138,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         let scroll = NSScrollView()
         scroll.documentView = table
         scroll.hasVerticalScroller = true
-        scroll.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        scroll.widthAnchor.constraint(equalToConstant: 130).isActive = true
         root.addArrangedSubview(scroll)
 
         let form = NSStackView()
         form.orientation = .vertical
-        form.spacing = 10
+        form.spacing = 8
+        form.alignment = .leading
         root.addArrangedSubview(form)
 
         addRow("Name", name, form)
@@ -152,9 +155,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         addRow("Terminal", terminal, form)
 
         let buttons = NSStackView()
-        buttons.spacing = 8
-        for (title, action) in [("Create / Update", #selector(save)), ("Launch", #selector(launch)), ("Remove", #selector(remove)), ("Reveal", #selector(reveal))] {
+        buttons.spacing = 6
+        for (title, action) in [("Save", #selector(save)), ("Launch", #selector(launch)), ("Remove", #selector(remove)), ("Reveal", #selector(reveal))] {
             let button = NSButton(title: title, target: self, action: action)
+            button.bezelStyle = .rounded
             buttons.addArrangedSubview(button)
         }
         form.addArrangedSubview(buttons)
@@ -215,8 +219,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     func addRow(_ label: String, _ field: NSView, _ stack: NSStackView) {
         let row = NSStackView()
         row.spacing = 8
+        row.alignment = .centerY
         let l = NSTextField(labelWithString: label)
-        l.widthAnchor.constraint(equalToConstant: 70).isActive = true
+        l.alignment = .right
+        l.textColor = .secondaryLabelColor
+        l.widthAnchor.constraint(equalToConstant: 68).isActive = true
+        field.widthAnchor.constraint(equalToConstant: 250).isActive = true
         row.addArrangedSubview(l)
         row.addArrangedSubview(field)
         stack.addArrangedSubview(row)
@@ -225,9 +233,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     func addFolderRow(_ stack: NSStackView) {
         let row = NSStackView()
         row.spacing = 8
+        row.alignment = .centerY
         let l = NSTextField(labelWithString: "Folder")
-        l.widthAnchor.constraint(equalToConstant: 70).isActive = true
+        l.alignment = .right
+        l.textColor = .secondaryLabelColor
+        l.widthAnchor.constraint(equalToConstant: 68).isActive = true
         let choose = NSButton(title: "Choose...", target: self, action: #selector(chooseFolder))
+        choose.bezelStyle = .rounded
+        cwd.widthAnchor.constraint(equalToConstant: 160).isActive = true
         row.addArrangedSubview(l)
         row.addArrangedSubview(cwd)
         row.addArrangedSubview(choose)
