@@ -1,0 +1,7 @@
+name = "termer-install"
+main = "Cloudflare/install-worker.js"
+compatibility_date = "2026-06-17"
+account_id = "64831a2b80653981fc5f32bf2ea9121c"
+routes = [
+  { pattern = "install.sushruth.dev/*", zone_name = "sushruth.dev" }
+]
