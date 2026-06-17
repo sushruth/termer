@@ -147,12 +147,21 @@ func userShell() -> String {
     return envShell.isEmpty ? "/bin/zsh" : envShell
 }
 
-// Inherit the GUI launch environment (USER, HOME, LOGNAME, SSH_AUTH_SOCK, …) so commands that
-// need them work; the login+interactive shell then layers on the user's profile/rc.
+// Inherit the GUI launch environment (so SSH_AUTH_SOCK etc. carry over), then backfill the
+// identity vars a GUI/launchd process is missing but a terminal always has. A login shell does
+// NOT set USER/LOGNAME itself (login(1) does), so we set them from the password database.
 func inheritedEnvironment() -> [String] {
     var env = ProcessInfo.processInfo.environment
     env["TERM"] = "xterm-256color"
-    return env.map { "\($0)=\($1)" }
+    if let pw = getpwuid(getuid()) {
+        func str(_ p: UnsafeMutablePointer<CChar>?) -> String? { p.map { String(cString: $0) } }
+        let name = str(pw.pointee.pw_name)
+        if env["USER"] == nil { env["USER"] = name }
+        if env["LOGNAME"] == nil { env["LOGNAME"] = name }
+        if env["HOME"] == nil { env["HOME"] = str(pw.pointee.pw_dir) }
+        if env["SHELL"] == nil { env["SHELL"] = str(pw.pointee.pw_shell) }
+    }
+    return env.compactMap { $1.isEmpty ? nil : "\($0)=\($1)" }
 }
 
 func splitArgs(_ s: String) -> [String] {

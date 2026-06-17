@@ -99,7 +99,7 @@ Bare commands such as `fresh`, `k9s`, or `lazygit` must work from GUI launch. GU
 
 The shell is the user's configured login shell — `getpwuid(getuid()).pw_shell` (Directory Services), preferring that over `$SHELL`, falling back to `/bin/zsh` — see `userShell()`. POSIX shells (zsh/bash) run `-lic "exec <cmd>"` (login + interactive, so `~/.zprofile`/`~/.zshrc` / `~/.bash_profile`/`~/.bashrc` load); fish runs `-l -c "exec <cmd>"` (no `-i` flag). Do not hardcode `/bin/zsh` — a bash/fish user must get their own shell and profile.
 
-The runner passes the inherited process environment (so `USER`, `HOME`, `LOGNAME`, `SSH_AUTH_SOCK`, etc. are present) with `TERM=xterm-256color` added — see `inheritedEnvironment()`. Do not pass a bare `["TERM=..."]` env; that wipes everything the command and the user's `~/.zshrc` expect.
+The runner passes the inherited process environment (so `SSH_AUTH_SOCK` etc. carry over) with `TERM=xterm-256color`, AND backfills the identity vars a GUI/launchd process is missing — `USER`, `LOGNAME`, `HOME`, `SHELL` — from the password database (`getpwuid`). See `inheritedEnvironment()`. This matters: a GUI launch's environment lacks `USER`/`LOGNAME` (a terminal gets them from `login(1)`, and a login *shell* does not set them itself), so commands reading `process.env.USER` break without the backfill. Do not pass a bare `["TERM=..."]` env; that wipes everything the command and the user's `~/.zshrc` expect.
 
 Keep shell launch unless it creates a measured problem. Direct exec is cleaner but breaks common user environments.
 
