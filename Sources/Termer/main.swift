@@ -560,10 +560,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         alert.runModal()
     }
 
+    // On-demand update: compare the running version to the latest GitHub release; if newer,
+    // drive the canonical installer (which replaces ~/Applications/Termer.app) and relaunch.
+    @objc func checkForUpdates() {
+        let url = URL(string: "https://api.github.com/repos/usually-frustrated/termer/releases/latest")!
+        var req = URLRequest(url: url)
+        req.setValue("termer", forHTTPHeaderField: "User-Agent")
+        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        URLSession.shared.dataTask(with: req) { data, _, _ in
+            let tag = data
+                .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                .flatMap { $0?["tag_name"] as? String }
+            DispatchQueue.main.async {
+                guard let tag else { return self.alert("Couldn't check for updates. Check your connection.") }
+                let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+                if latest == Store.version {
+                    self.alert("Termer \(Store.version) is the latest version.")
+                } else {
+                    self.promptUpdate(latest)
+                }
+            }
+        }.resume()
+    }
+
+    func promptUpdate(_ latest: String) {
+        let a = NSAlert()
+        a.messageText = "Update available"
+        a.informativeText = "Termer \(latest) is available (you have \(Store.version)). Update now?"
+        a.addButton(withTitle: "Update")
+        a.addButton(withTitle: "Later")
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        runInstaller()
+    }
+
+    func runInstaller() {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        p.arguments = ["-lc", "curl -fsSL https://termer.frustrated.dev/install | zsh"]
+        p.terminationHandler = { proc in
+            DispatchQueue.main.async {
+                proc.terminationStatus == 0 ? self.relaunch() : self.alert("Update failed. Try the install command in a terminal.")
+            }
+        }
+        do { try p.run() } catch { alert("Update failed: \(error.localizedDescription)") }
+    }
+
+    func relaunch() {
+        // The installer reopens the new bundle, but `open` would just reactivate this still-running
+        // instance (same bundle id), so quit first and let a detached `open` launch the new binary.
+        let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Termer.app").path
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "sleep 1; open \"\(path)\""]
+        try? p.run()
+        NSApp.terminate(nil)
+    }
+
     func makeMenu() -> NSMenu {
         let menu = NSMenu()
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Termer", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         menu.addItem(appMenuItem)
