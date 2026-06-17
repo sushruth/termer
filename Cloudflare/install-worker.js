@@ -33,14 +33,14 @@ async function handle(request) {
 <link rel="icon" href="https://raw.githubusercontent.com/usually-frustrated/termer/main/icons/web/favicon.ico">
 <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/usually-frustrated/termer/main/icons/web/apple-touch-icon.png">
 <style>
-  :root { color-scheme: light dark; font: 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+  :root { color-scheme: light dark; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: Canvas; color: CanvasText; }
-  main { width: min(560px, calc(100vw - 48px)); }
-  .logo { width: 72px; height: 72px; border-radius: 16px; display: block; margin: 0 0 18px; }
-  h1 { font-size: 40px; letter-spacing: 0; margin: 0 0 10px; }
-  p { margin: 0 0 22px; color: color-mix(in srgb, CanvasText 68%, Canvas); }
-  .shot { display: block; max-width: 100%; border-radius: 10px; border: 1px solid color-mix(in srgb, CanvasText 14%, Canvas); margin: 0 0 22px; }
-  code { display: block; padding: 14px 16px; border: 1px solid color-mix(in srgb, CanvasText 14%, Canvas); border-radius: 8px; overflow-x: auto; }
+  main { width: min(340px, calc(100vw - 40px)); }
+  .logo { width: 44px; height: 44px; border-radius: 10px; display: block; margin: 0 0 12px; }
+  h1 { font-size: 24px; letter-spacing: 0; margin: 0 0 6px; }
+  p { margin: 0 0 14px; color: color-mix(in srgb, CanvasText 68%, Canvas); }
+  .shot { display: block; max-width: 100%; border-radius: 8px; border: 1px solid color-mix(in srgb, CanvasText 14%, Canvas); margin: 0 0 14px; }
+  code { display: block; padding: 10px 12px; font-size: 12px; border: 1px solid color-mix(in srgb, CanvasText 14%, Canvas); border-radius: 8px; overflow-x: auto; }
   a { color: LinkText; }
 </style>
 <main>
