@@ -337,6 +337,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
 
     func rebuildTiles() {
         tiles.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        if apps.isEmpty {
+            let hint = NSTextField(labelWithString: "Add a TUI app to get started")
+            hint.textColor = .secondaryLabelColor
+            hint.font = .systemFont(ofSize: 13)
+            tiles.addArrangedSubview(hint)
+        }
         var row = tileRow()
         for (i, app) in (apps + [TuiApp(name: "+", command: "", args: "", cwd: "", terminal: "Embedded", dynamicCwd: false, icon: nil)]).enumerated() {
             if row.arrangedSubviews.count == 3 {
