@@ -155,17 +155,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     let args = NSTextField()
     let cwd = NSTextField()
     let dynamicCwd = NSButton(checkboxWithTitle: "Ask", target: nil, action: nil)
-    let terminal = NSPopUpButton()
-    let appPicker = NSPopUpButton()
+    var editing: TuiApp?  // app currently loaded in the form (nil = new); drives Launch/Remove/Reveal
     let tiles = NSStackView()
     let form = NSStackView()
     var saveButton: NSButton?
     var savedState = ""
+    var window: NSWindow!  // strong ref: AppKit's window list alone races the close animation teardown
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 252),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                              backing: .buffered, defer: false)
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 252),
+                          styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                          backing: .buffered, defer: false)
         window.title = "Termer"
         window.titleVisibility = .hidden
         window.toolbarStyle = .unifiedCompact
@@ -213,9 +213,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         back.controlSize = .large
         form.addArrangedSubview(back)
 
-        appPicker.target = self
-        appPicker.action = #selector(pickApp)
-        addRow("Saved", appPicker, form)
         addRow("Name", name, form)
         icon.placeholderString = "emoji or character"
         icon.completes = true
@@ -226,9 +223,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         addRow("Command", command, form)
         addRow("Args", args, form)
         addFolderRow(form)
-        terminal.addItems(withTitles: ["Embedded"])
-        terminal.isEnabled = false
-        addRow("Mode", terminal, form)
 
         let buttons = NSStackView()
         buttons.spacing = 10
@@ -249,6 +243,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         window.makeKeyAndOrderFront(nil)
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
     func numberOfRows(in tableView: NSTableView) -> Int { apps.count }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -262,27 +258,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         show(apps[table.selectedRow])
     }
 
-    @objc func pickApp() {
-        guard appPicker.indexOfSelectedItem > 0 else { return showTiles() }
-        show(apps[appPicker.indexOfSelectedItem - 1])
-        showForm()
-    }
-
     @objc func pickTile(_ sender: NSButton) {
         show(apps[sender.tag])
-        appPicker.selectItem(at: sender.tag + 1)
         showForm()
     }
 
     @objc func newApp() {
-        appPicker.selectItem(at: 0)
+        editing = nil
         name.stringValue = ""
         icon.stringValue = ""
         command.stringValue = ""
         args.stringValue = ""
         cwd.stringValue = FileManager.default.homeDirectoryForCurrentUser.path
         dynamicCwd.state = .off
-        terminal.selectItem(withTitle: "Embedded")
         updateFolderEnabled()
         snapshot()
         showForm()
@@ -291,33 +279,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     @objc func save() {
         guard !name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return alert("Name is required.") }
         guard !command.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return alert("Command is required.") }
-        let app = TuiApp(name: name.stringValue, command: command.stringValue, args: args.stringValue, cwd: cwd.stringValue, terminal: terminal.titleOfSelectedItem ?? "Embedded", dynamicCwd: dynamicCwd.state == .on, icon: icon.stringValue)
+        let app = TuiApp(name: name.stringValue, command: command.stringValue, args: args.stringValue, cwd: cwd.stringValue, terminal: "Embedded", dynamicCwd: dynamicCwd.state == .on, icon: icon.stringValue)
         do { try store.save(app); reload(selecting: app.name) } catch { alert(error.localizedDescription) }
     }
 
-    @objc func launch() { selected.map(store.launch) }
-    @objc func reveal() { selected.map(store.reveal) }
+    @objc func launch() { editing.map(store.launch) }
+    @objc func reveal() { editing.map(store.reveal) }
     @objc func remove() {
-        guard let app = selected else { return }
+        guard let app = editing else { return }
         do { try store.remove(app); reload() } catch { alert(error.localizedDescription) }
-    }
-
-    var selected: TuiApp? {
-        let i = appPicker.indexOfSelectedItem - 1
-        return i >= 0 && i < apps.count ? apps[i] : nil
     }
 
     func reload(selecting selectedName: String? = nil) {
         apps = store.load()
-        table.reloadData()
         rebuildTiles()
-        appPicker.removeAllItems()
-        appPicker.addItem(withTitle: "All Apps")
-        appPicker.addItems(withTitles: apps.map(\.name))
-        if let selectedName, let row = apps.firstIndex(where: { $0.name == selectedName }) {
-            table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
-            appPicker.selectItem(at: row + 1)
-            snapshot()
+        if let selectedName, let app = apps.first(where: { $0.name == selectedName }) {
+            show(app)
             showForm()
         } else {
             showTiles()
@@ -388,20 +365,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         card.imagePosition = .imageOnly
         card.image = image
         card.imageScaling = fills ? .scaleAxesIndependently : .scaleProportionallyDown
-        card.wantsLayer = true
-        card.layer?.cornerRadius = 12
-        card.layer?.masksToBounds = true
-        card.layer?.borderWidth = 1
-        card.layer?.borderColor = NSColor.separatorColor.cgColor
-        card.baseBackground = fills ? .clear : NSColor.quaternaryLabelColor.withAlphaComponent(0.2)
-        card.widthAnchor.constraint(equalToConstant: 132).isActive = true
-        card.heightAnchor.constraint(equalToConstant: 82).isActive = true
+
+        let host: NSView
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView()
+            glass.cornerRadius = 14
+            glass.contentView = card
+            card.hoverHandler = { glass.tintColor = $0 ? NSColor.selectedContentBackgroundColor.withAlphaComponent(0.25) : nil }
+            host = glass
+        } else {
+            card.wantsLayer = true
+            card.layer?.cornerRadius = 12
+            card.layer?.masksToBounds = true
+            card.layer?.borderWidth = 1
+            card.layer?.borderColor = NSColor.separatorColor.cgColor
+            let base: NSColor = fills ? .clear : NSColor.quaternaryLabelColor.withAlphaComponent(0.2)
+            card.layer?.backgroundColor = base.cgColor
+            card.hoverHandler = { card.layer?.backgroundColor = ($0 ? NSColor.selectedContentBackgroundColor.withAlphaComponent(0.22) : base).cgColor }
+            host = card
+        }
+        host.widthAnchor.constraint(equalToConstant: 132).isActive = true
+        host.heightAnchor.constraint(equalToConstant: 82).isActive = true
 
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 5
-        stack.addArrangedSubview(card)
+        stack.addArrangedSubview(host)
         if !caption.isEmpty {
             let label = NSTextField(labelWithString: caption)
             label.textColor = .secondaryLabelColor
@@ -416,6 +406,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
     }
 
     func show(_ app: TuiApp) {
+        editing = app
         name.stringValue = app.name
         icon.stringValue = app.icon ?? ""
         command.stringValue = app.command
@@ -423,14 +414,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         cwd.stringValue = app.cwd
         dynamicCwd.state = app.dynamicCwd == true ? .on : .off
         updateFolderEnabled()
-        terminal.selectItem(withTitle: app.terminal)
         snapshot()
     }
 
     // Save is enabled only when the form differs from the last loaded/saved state.
     func currentState() -> String {
         [name.stringValue, icon.stringValue, command.stringValue, args.stringValue, cwd.stringValue,
-         dynamicCwd.state == .on ? "1" : "0", terminal.titleOfSelectedItem ?? ""].joined(separator: "\u{1f}")
+         dynamicCwd.state == .on ? "1" : "0"].joined(separator: "\u{1f}")
     }
 
     func snapshot() { savedState = currentState(); updateDirty() }
@@ -618,9 +608,9 @@ func iconImage(_ glyph: String?, size: CGFloat) -> NSImage? {
     return img
 }
 
-// Tile that brightens on hover (Tahoe-style highlight).
+// Tile that reports hover so the wrapping glass/layer can highlight.
 final class TileButton: NSButton {
-    var baseBackground: NSColor = .clear { didSet { layer?.backgroundColor = baseBackground.cgColor } }
+    var hoverHandler: ((Bool) -> Void)?
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -628,13 +618,8 @@ final class TileButton: NSButton {
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self))
     }
 
-    override func mouseEntered(with event: NSEvent) {
-        layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.22).cgColor
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = baseBackground.cgColor
-    }
+    override func mouseEntered(with event: NSEvent) { hoverHandler?(true) }
+    override func mouseExited(with event: NSEvent) { hoverHandler?(false) }
 }
 
 func splitArgs(_ s: String) -> [String] {

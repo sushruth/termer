@@ -97,6 +97,8 @@ Each generated app captures a screenshot of its own terminal window (in-process 
 
 Bare commands such as `fresh`, `k9s`, or `lazygit` must work from GUI launch. GUI apps do not inherit terminal PATH, so `TermerRunner` launches through `/bin/zsh -lic` to resolve Homebrew, mise, asdf, aliases that become shell commands, and user PATH setup.
 
+The runner passes the inherited process environment (so `USER`, `HOME`, `LOGNAME`, `SSH_AUTH_SOCK`, etc. are present) with `TERM=xterm-256color` added — see `inheritedEnvironment()`. Do not pass a bare `["TERM=..."]` env; that wipes everything the command and the user's `~/.zshrc` expect.
+
 Keep shell launch unless it creates a measured problem. Direct exec is cleaner but breaks common user environments.
 
 ## Dynamic Folder and Args
@@ -133,14 +135,14 @@ Current manager starts on a centered tile screen:
 Current form surface:
 
 - `‹ All Apps` back button (returns to the tile screen)
-- Saved app picker
 - Name
 - Icon: editable combo box of monochrome Unicode glyph presets; any character/emoji can be typed or pasted (rendered monochrome regardless)
 - Command
 - Args
 - Folder plus `Ask`
-- Mode: Embedded
 - Save, Launch, Remove, Reveal
+
+The form has no "Saved" picker (tiles are the navigation) and no "Mode" control (Embedded is the only mode; the field was always disabled). The app being edited is tracked by `editing`, which drives Launch/Remove/Reveal. `TuiApp.terminal` stays in the struct (always `"Embedded"`) for config compatibility; the external-terminal `launcher()` path is vestigial.
 
 Save is enabled only when the form differs from the last loaded/saved state; it greys out again after a successful save (the success signal).
 

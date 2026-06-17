@@ -45,7 +45,7 @@ final class Runner: NSObject, NSApplicationDelegate, NSWindowDelegate {
         terminal.startProcess(
             executable: "/bin/zsh",
             args: ["-lic", "exec \(commandLine)"],
-            environment: ["TERM=xterm-256color"],
+            environment: inheritedEnvironment(),
             execName: config.name,
             currentDirectory: cwd
         )
@@ -130,6 +130,14 @@ func thumbURL(_ name: String) -> URL {
 
 func slug(_ s: String) -> String {
     s.lowercased().filter { $0.isLetter || $0.isNumber || $0 == "-" }
+}
+
+// Inherit the GUI launch environment (USER, HOME, LOGNAME, SSH_AUTH_SOCK, …) so commands that
+// need them work; the `-lic` login+interactive shell then layers on ~/.zprofile and ~/.zshrc.
+func inheritedEnvironment() -> [String] {
+    var env = ProcessInfo.processInfo.environment
+    env["TERM"] = "xterm-256color"
+    return env.map { "\($0)=\($1)" }
 }
 
 func splitArgs(_ s: String) -> [String] {
