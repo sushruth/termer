@@ -7,6 +7,7 @@ app=".build/Termer.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS"
 cp ".build/release/Termer" "$app/Contents/MacOS/Termer"
+cp ".build/release/TermerRunner" "$app/Contents/MacOS/TermerRunner"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -19,5 +20,6 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
   <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict></plist>
 PLIST
+codesign --force --options runtime --timestamp --sign "${TERMER_SIGN_IDENTITY:--}" "$app/Contents/MacOS/TermerRunner" >/dev/null
 codesign --force --options runtime --timestamp --sign "${TERMER_SIGN_IDENTITY:--}" "$app" >/dev/null
 echo "$PWD/$app"

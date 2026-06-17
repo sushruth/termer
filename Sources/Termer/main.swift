@@ -50,14 +50,19 @@ final class Store {
         let bundle = bundleURL(app)
         let contents = bundle.appendingPathComponent("Contents", isDirectory: true)
         let macOS = contents.appendingPathComponent("MacOS", isDirectory: true)
+        let resources = contents.appendingPathComponent("Resources", isDirectory: true)
         try? FileManager.default.removeItem(at: bundle)
         try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
 
-        let exe = macOS.appendingPathComponent("launcher")
-        try launcher(app).write(to: exe, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: exe.path)
+        try FileManager.default.copyItem(at: runnerURL(), to: macOS.appendingPathComponent("TermerRunner"))
+        try JSONEncoder().encode(app).write(to: resources.appendingPathComponent("config.json"))
         try plist(app).write(to: contents.appendingPathComponent("Info.plist"), atomically: true, encoding: .utf8)
         _ = run("/usr/bin/codesign", ["--force", "--sign", "-", bundle.path])
+    }
+
+    private func runnerURL() -> URL {
+        Bundle.main.executableURL!.deletingLastPathComponent().appendingPathComponent("TermerRunner")
     }
 
     private func launcher(_ app: TuiApp) -> String {
@@ -95,7 +100,7 @@ final class Store {
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0"><dict>
-          <key>CFBundleExecutable</key><string>launcher</string>
+          <key>CFBundleExecutable</key><string>TermerRunner</string>
           <key>CFBundleIdentifier</key><string>local.termer.\(slug(app.name))</string>
           <key>CFBundleName</key><string>\(xml(app.name))</string>
           <key>CFBundleDisplayName</key><string>\(xml(app.name))</string>
@@ -151,8 +156,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource,
         addRow("Command", command, form)
         addRow("Args", args, form)
         addFolderRow(form)
-        terminal.addItems(withTitles: ["Ghostty", "Terminal", "iTerm2"])
-        addRow("Terminal", terminal, form)
+        terminal.addItems(withTitles: ["Embedded"])
+        terminal.isEnabled = false
+        addRow("Mode", terminal, form)
 
         let buttons = NSStackView()
         buttons.spacing = 6

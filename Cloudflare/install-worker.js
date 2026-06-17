@@ -1,26 +1,31 @@
 addEventListener("fetch", event => {
-  const url = new URL(event.request.url)
+  event.respondWith(handle(event.request))
+})
+
+async function handle(request) {
+  const url = new URL(request.url)
+
   if (url.pathname === "/install" || url.pathname === "/install.sh") {
-    event.respondWith(fetch("https://github.com/sushruth/termer/releases/latest/download/install.sh", {
-      headers: { "Cache-Control": "no-cache" },
-      cf: { cacheTtl: 0, cacheEverything: false }
-    }).then(response => response.text()).then(body => new Response(body, {
+    const release = await fetch("https://api.github.com/repos/sushruth/termer/releases/latest", {
       headers: {
-        "content-type": "application/x-sh; charset=utf-8",
-        "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
-        "pragma": "no-cache",
-        "expires": "0"
-      }
-    })))
-    return
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "termer-install",
+        "Cache-Control": "no-cache"
+      },
+      cf: { cacheTtl: 0, cacheEverything: false }
+    }).then(response => response.json())
+
+    return Response.redirect(
+      `https://github.com/sushruth/termer/releases/download/${release.tag_name}/install.sh`,
+      302
+    )
   }
 
   if (url.pathname !== "/") {
-    event.respondWith(new Response("not found\n", { status: 404 }))
-    return
+    return new Response("not found\n", { status: 404 })
   }
 
-  event.respondWith(new Response(`<!doctype html>
+  return new Response(`<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -44,5 +49,5 @@ addEventListener("fetch", event => {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store, no-cache, must-revalidate, max-age=0"
     }
-  }))
-})
+  })
+}
