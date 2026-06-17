@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-repo="${TERMER_REPO:-sushruth/termer}"
+repo="${TERMER_REPO:-usually-frustrated/termer}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 

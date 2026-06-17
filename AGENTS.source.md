@@ -50,7 +50,7 @@ Release signs nested binaries first, then signs/notarizes/staples `Termer.app`. 
 Install/test:
 
 ```bash
-curl -fsSL https://termer.sushruth.dev/install | zsh
+curl -fsSL https://termer.frustrated.dev/install | zsh
 ```
 
 The installer endpoint resolves the latest GitHub release and redirects to a concrete versioned release asset. Normal app releases do not require a Cloudflare deploy.
@@ -170,13 +170,13 @@ If appearance resolution emits deprecation warnings, clean that before moving on
 Primary installer:
 
 ```bash
-curl -fsSL https://termer.sushruth.dev/install | zsh
+curl -fsSL https://termer.frustrated.dev/install | zsh
 ```
 
 Site:
 
 ```text
-https://termer.sushruth.dev
+https://termer.frustrated.dev
 ```
 
 Cloudflare Worker owns the site and install route. GitHub Releases own binary hosting. Do not move binaries to Cloudflare unless GitHub Releases becomes a real problem.

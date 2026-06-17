@@ -3,5 +3,5 @@ main = "Cloudflare/install-worker.js"
 compatibility_date = "2026-06-17"
 account_id = "64831a2b80653981fc5f32bf2ea9121c"
 routes = [
-  { pattern = "termer.sushruth.dev/*", zone_name = "sushruth.dev" }
+  { pattern = "termer.frustrated.dev", custom_domain = true }
 ]

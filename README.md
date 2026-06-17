@@ -5,10 +5,10 @@ GUI app for creating macOS `.app` wrappers around TUI commands.
 Install latest release:
 
 ```sh
-curl -fsSL https://termer.sushruth.dev/install | zsh
+curl -fsSL https://termer.frustrated.dev/install | zsh
 ```
 
-Site: https://termer.sushruth.dev
+Site: https://termer.frustrated.dev
 
 Build locally:
 
