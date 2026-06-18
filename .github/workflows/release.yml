@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       TERMER_SIGN_IDENTITY: "Developer ID Application: Sushruth Sastry (5G2TDMV275)"
     steps:
