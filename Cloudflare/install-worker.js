@@ -34,7 +34,7 @@ async function handle(request) {
 <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/usually-frustrated/termer/main/icons/web/apple-touch-icon.png">
 <style>
   :root { color-scheme: light dark; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: Canvas; color: CanvasText; }
+  body { margin: 0; min-height: 100svh; display: grid; place-items: center; background: Canvas; color: CanvasText; }
   main { width: min(340px, calc(100vw - 40px)); }
   .logo { width: 44px; height: 44px; border-radius: 10px; display: block; margin: 0 0 12px; }
   h1 { font-size: 24px; letter-spacing: 0; margin: 0 0 6px; }
