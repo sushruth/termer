@@ -23,7 +23,13 @@ Keep small. OS provides PTYs, not embeddable Terminal.app. ⊖ cloning Terminal/
 §BUILD & RELEASE
 Local build: `Scripts/package.sh`
 
-Release:
+Release (CI): push `vX.Y.Z` tag → `.github/workflows/release.yml` (runner `macos-26`, needs macOS 26 SDK for `NSGlassEffectView`): import Developer ID cert from secrets → temp keychain, `package.sh`, notarize (Apple ID + app pwd), staple, `gh release create`. `workflow_dispatch` = full build/sign/notarize but skips publish (guard `GITHUB_REF_TYPE=tag`) → pipeline test w/o tag.
+```bash
+git tag vX.Y.Z && git push origin vX.Y.Z
+```
+Secrets (`gh secret set` once): `MACOS_CERTIFICATE` (base64 `.p12`), `MACOS_CERTIFICATE_PWD`, `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`. Identity name hardcoded in workflow env, must match `security find-identity`.
+
+Local fallback:
 ```bash
 TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TERMER_NOTARY_PROFILE="termer" Scripts/release.sh vX.Y.Z
 ```
@@ -51,12 +57,8 @@ Per release, in order:
    claude -p "Read AGENTS.source.md, apply REGEN compression rules (exclude REGEN), write AGENTS.md. Prepend two-line disclaimer." --allowedTools 'Read,Edit,Write' --max-turns 10
    ```
 2. Pick version: `gh release list`, bump vX.Y.Z (patch: fixes/tweaks, minor: features). Repo = `usually-frustrated/termer`.
-3. Build, sign, notarize, publish:
-   ```bash
-   TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TERMER_NOTARY_PROFILE="termer" Scripts/release.sh vX.Y.Z
-   ```
-   Runs: `package.sh` → swift build release, copy TermerRunner/AppIcon.icns/bundle, write Info.plist w/ TERMER_VERSION, sign nested→outer. Zips, notarytool submit --wait, stapler staple, gh release create (uploads zip + install.sh). Notary fail → read log.
-4. Push: `git push`
+3. Push: `git push`
+4. Tag → release: `git tag vX.Y.Z && git push origin vX.Y.Z`. CI (`release.yml`, `macos-26`) builds, signs, notarizes, staples, `gh release create` (zip + install.sh). Build = `package.sh` (swift build release, copy TermerRunner/AppIcon.icns/bundle, Info.plist w/ TERMER_VERSION, sign nested→outer). Watch: `gh run watch`. Notary fail → read log. Dry-run w/o publish = `workflow_dispatch`. Local fallback: `Scripts/release.sh vX.Y.Z`.
 5. Cloudflare: only if install-worker.js or wrangler.toml changed, run `wrangler deploy`. (Route deletion = dashboard only.)
 6. Site screenshot: UI changed? Recapture `docs/screenshot.png` (active window), `git push`. Raw GitHub serves, no redeploy.
 7. Reach: New version reaches users two ways — generated app bundles auto-regenerate on next launch via `builtBy`; manager app updates on toolbar **Update** pill click / Check for Updates (or curl reinstall).

@@ -37,7 +37,15 @@ Build locally:
 Scripts/package.sh
 ```
 
-Release:
+Release (CI): push a `vX.Y.Z` tag. `.github/workflows/release.yml` builds on a `macos-26` runner (macOS 26 SDK — required for `NSGlassEffectView`), imports the Developer ID cert from secrets into a temp keychain, runs `package.sh`, notarizes (Apple ID + app-specific password), staples, and `gh release create`s. Manual `workflow_dispatch` runs the full build/sign/notarize but skips the publish (guarded on `GITHUB_REF_TYPE = tag`) — use it to test the pipeline without burning a tag.
+
+```bash
+git tag vX.Y.Z && git push origin vX.Y.Z
+```
+
+Required repo secrets (set once via `gh secret set`): `MACOS_CERTIFICATE` (base64 Developer ID `.p12`), `MACOS_CERTIFICATE_PWD`, `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`. The signing-identity name is hardcoded in the workflow env and must match `security find-identity` output.
+
+Local fallback (signs/notarizes from your Mac's keychain profile):
 
 ```bash
 TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TERMER_NOTARY_PROFILE="termer" Scripts/release.sh vX.Y.Z
@@ -70,12 +78,8 @@ Do these in order for every release:
    claude -p "Read AGENTS.source.md, apply the REGEN compression rules to compress it (exclude REGEN section), write AGENTS.md. Always prepend the two-line auto-generated disclaimer at the very top." --allowedTools 'Read,Edit,Write' --max-turns 10
    ```
 2. **Pick the next version.** Check `gh release list` and bump `vX.Y.Z` (patch for fixes/tweaks, minor for features). Repo is `usually-frustrated/termer` (gh auto-detects it from the remote).
-3. **Build, sign, notarize, publish** in one shot:
-   ```bash
-   TERMER_SIGN_IDENTITY="Developer ID Application: Sushruth Sastry (5G2TDMV275)" TERMER_NOTARY_PROFILE="termer" Scripts/release.sh vX.Y.Z
-   ```
-   This runs `package.sh` (`swift build -c release`; copies `TermerRunner`, `AppIcon.icns`, and `Termer_Termer.bundle`; writes `Info.plist` with `TERMER_VERSION`→`CFBundleShortVersionString`; signs nested-then-outer), zips, `notarytool submit --wait`, `stapler staple`, and `gh release create` (uploads the zip + `install.sh`). On notary failure read the log first (see Signing section).
-4. **Push commits:** `git push`.
+3. **Push commits:** `git push`.
+4. **Tag to release:** `git tag vX.Y.Z && git push origin vX.Y.Z`. CI (`release.yml`, `macos-26`) builds, signs, notarizes, staples, and `gh release create`s the zip + `install.sh`. The build runs `package.sh` (`swift build -c release`; copies `TermerRunner`, `AppIcon.icns`, `Termer_Termer.bundle`; writes `Info.plist` with `TERMER_VERSION`→`CFBundleShortVersionString`; signs nested-then-outer). Watch with `gh run watch`. On notary failure read the log first (see Signing section). To dry-run without publishing, trigger `workflow_dispatch` instead of tagging. Local `Scripts/release.sh vX.Y.Z` remains the fallback if CI is unavailable.
 5. **Cloudflare:** only if `Cloudflare/install-worker.js` or `wrangler.toml` changed, run `wrangler deploy`. (Route deletion has no wrangler command — do it in the dashboard.)
 6. **Site screenshot:** if the UI changed and you want the site to reflect it, recapture `docs/screenshot.png` (active window — see the screenshot note) and `git push`; raw GitHub serves it, no redeploy needed.
 7. **Reach:** the new version reaches users two ways — generated app bundles auto-regenerate on next launch via `builtBy`; the manager app itself only updates when the user clicks the toolbar **Update** pill / Check for Updates (or reinstalls via curl).
