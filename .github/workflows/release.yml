@@ -45,5 +45,9 @@ jobs:
             --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
           xcrun stapler staple .build/Termer.app
           ditto -c -k --keepParent .build/Termer.app ".build/Termer-$version.zip"
-          gh release create "$version" ".build/Termer-$version.zip" Scripts/install.sh \
-            --title "Termer $version" --notes "Termer $version"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            gh release create "$version" ".build/Termer-$version.zip" Scripts/install.sh \
+              --title "Termer $version" --notes "Termer $version"
+          else
+            echo "manual dispatch ($version): built+notarized, skipping release publish"
+          fi
