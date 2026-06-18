@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -38,7 +39,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           version="$GITHUB_REF_NAME"
-          TERMER_VERSION="$version" Scripts/package.sh >/dev/null
+          TERMER_VERSION="$version" Scripts/package.sh
           ditto -c -k --keepParent .build/Termer.app ".build/Termer-$version.zip"
           xcrun notarytool submit ".build/Termer-$version.zip" \
             --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
